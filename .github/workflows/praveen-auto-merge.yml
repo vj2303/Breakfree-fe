@@ -1,0 +1,41 @@
+name: Auto PR & Merge from praveen
+
+on:
+  push:
+    branches:
+      - praveen
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  pr-and-merge:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create Pull Request
+        id: create_pr
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.OWNER_GH_TOKEN }}
+          base: main
+          branch: praveen
+          title: "Auto merge praveen → main"
+          body: |
+            This PR was automatically created from the praveen branch.
+            It will be merged automatically by the repository owner bot.
+          commit-message: "chore: sync praveen into main"
+          delete-branch: false
+          draft: false
+
+      - name: Merge Pull Request
+        if: steps.create_pr.outputs.pull-request-number != ''
+        uses: peter-evans/merge-pull-request@v3
+        with:
+          token: ${{ secrets.OWNER_GH_TOKEN }}
+          pull-request: ${{ steps.create_pr.outputs.pull-request-number }}
+          merge-method: squash

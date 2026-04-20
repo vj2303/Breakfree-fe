@@ -1,0 +1,157 @@
+Title: Why we enforce globally unique emails across Participant, Assessor, and Admin accounts
+
+Context
+-------
+The Breakfree backend uses three different models around identity:
+
+- User        → actual login account (has password, role, JWT token).
+- Participant → person being assessed.
+- AppUser     → application-side user such as an Assessor or Learner (and other admin-like app users).
+
+Originally, these three models each enforced email uniqueness **within their own collection** only, not across each other. This meant the same email address (for example, `alex@example.com`) could legally exist in multiple places at once:
+
+- Participant.email = alex@example.com
+- AppUser.email    = alex@example.com
+- User.email       = alex@example.com
+
+That flexibility caused confusing and unsafe behavior for authentication and role detection.
+
+
+Concrete example of the old problem
+-----------------------------------
+Scenario: the same person is created as both a Participant and an Assessor using the same email.
+
+1. Admin creates a Participant
+   - Admin calls the backend to create a participant:
+     - POST /api/participants
+     - body: { name: "Alex", email: "alex@example.com", ... }
+   - Backend creates:
+     - Participant(email = "alex@example.com")
+   - No login account (`User`) exists yet.
+
+2. Admin sends participant login credentials
+   - Admin triggers:
+     - POST /api/participants/send-bulk-login-credentials
+     - with this participant’s ID.
+   - Backend behavior:
+     - Sees there is no User with alex@example.com.
+     - Creates User(email = "alex@example.com", role = USER, password = P1).
+     - Sends Alex an email with password P1.
+   - At this point:
+     - Participant(email = "alex@example.com")
+     - User(email = "alex@example.com", role = USER, password = P1)
+   - Alex can now log in as a **participant**.
+
+3. Later, admin also creates Alex as an Assessor (same email)
+   - Admin calls:
+     - POST /api/assessors
+     - body: { name: "Alex", email: "alex@example.com", designation: "...", ... }
+   - Backend creates:
+     - AppUser(email = "alex@example.com", accessLevel = ACCESSOR)
+   - This is allowed because AppUser.email and Participant.email live in separate collections.
+
+4. Admin sends assessor login credentials
+   - Admin triggers:
+     - POST /api/assessors/send-bulk-login-credentials
+     - with this assessor’s ID.
+   - Backend behavior (OLD logic):
+     - Looks up User(email = "alex@example.com").
+     - Because it exists, it **updates it in-place**:
+       - Sets a new password P2.
+       - Role is changed to ASSESSOR.
+       - Marks isActive = true.
+   - Final state:
+     - Participant(email = "alex@example.com")
+     - AppUser(email = "alex@example.com", accessLevel = ACCESSOR)
+     - User(email = "alex@example.com", role = ASSESSOR, password = P2)
+
+What Alex experiences:
+
+- The original participant password (P1) stops working; only the new assessor password (P2) is valid.
+- When Alex logs in, `/api/auth/login` returns a user with role = ASSESSOR.
+- `/api/auth/me` now returns only `assessorId` (no `participantId`), because the User role is ASSESSOR.
+- From the frontend point of view, Alex’s account “mysteriously turned into an assessor” and participant access breaks, even though the participant record still exists in the database.
+
+This is very hard to reason about from the UI and from support/debugging: the same email can be a participant, an assessor, and have its role mutated depending on which bulk-credentials flow ran last.
+
+
+What we changed
+---------------
+We now enforce **global email uniqueness across all identity-related models** on the backend:
+
+- Before creating or updating:
+  - a Participant (`/api/participants`),
+  - an Assessor/AppUser (`/api/assessors`, `/api/users`),
+  - or an Admin login (`/api/auth/register`, which creates a User),
+
+  the backend checks for an existing record with the same email in:
+
+  - User (login accounts)
+  - Participant
+  - AppUser (assessors / learners)
+
+- If any record already uses that email, the backend responds with:
+  - HTTP 409 Conflict
+  - A clear message such as:
+    - "Participant with this email already exists"
+    - "Assessor with this email already exists"
+    - "An account with this email already exists"
+
+In other words: **one email → one identity**.
+
+
+Concrete example with the new rules
+-----------------------------------
+Re-running the same scenario, but with global email uniqueness enforced.
+
+1. Admin creates a Participant (same as before)
+   - POST /api/participants
+   - body: { name: "Alex", email: "alex@example.com", ... }
+   - Backend creates:
+     - Participant(email = "alex@example.com")
+
+2. Admin sends participant login credentials
+   - POST /api/participants/send-bulk-login-credentials
+   - Backend creates:
+     - User(email = "alex@example.com", role = USER, password = P1)
+   - Alex can log in as a participant using P1.
+
+3. Admin tries to also create Alex as an Assessor with the same email
+   - POST /api/assessors
+   - body: { name: "Alex", email: "alex@example.com", ... }
+   - Backend now checks:
+     - Participant(email = "alex@example.com") → found
+   - Backend responds:
+     - HTTP 409 Conflict
+     - Message: "A participant with this email already exists"
+   - No AppUser is created, no User is updated/overwritten.
+
+Result:
+
+- Alex’s participant login continues to work with the original credentials (P1).
+- There is **no hidden role mutation**, and frontend behavior remains stable and predictable.
+
+
+How the frontend should react
+-----------------------------
+- When a create/update call for Admin, Participant, or Assessor returns 409:
+  - Show a clear validation message next to the email field, e.g.:
+    - "This email is already used by another account type. Please use a different email."
+- Do **not** try to automatically “convert” a participant into an assessor (or vice versa) from the frontend.
+  - Any such conversion should be a deliberate backend-side operation with explicit rules.
+- Treat "one email → one identity" as part of the contract:
+  - Each real person should either:
+    - use a single role-specific email (e.g. `alex.assessor@company.com` vs `alex.participant@company.com`), or
+    - use a separate identity in the system if they must appear both as participant and assessor.
+
+
+Why this design is safer and simpler
+------------------------------------
+- Avoids subtle security and UX problems where:
+  - one flow silently overwrites another flow’s login account, or
+  - the person’s role as seen in `/api/auth/me` changes depending on which bulk-credentials endpoint ran last.
+- Makes role-based routing in the frontend (`/dashboard`, `/participant/dashboard`, `/assessor/dashboard`) deterministic:
+  - The backend is the single source of truth for "who this email belongs to" and "what their role is".
+- Simplifies support/debugging:
+  - If a user says "I can’t log in", we no longer have to consider multiple overlapping identities under the same email.
+

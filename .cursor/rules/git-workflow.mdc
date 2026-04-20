@@ -1,0 +1,16 @@
+---
+description: Git workflow rules for breakfree frontend and backend
+alwaysApply: true
+---
+
+# Git Workflow Rules
+
+- Avoid changing git configuration files such as `.git/config` directly.
+- Do not run commands that modify git config (for example, `git config ...`) from the assistant.
+- Never commit log files like `server/logs/combined.log` or `server/logs/error.log`.
+- For the backend repo (`breakfree-server`), only commit source and configuration files that are needed for the application to run.
+- When the user asks to push:
+  - For the **frontend** (`breakfree-frontend`), prefer pushing the current branch to the remote the user specifies (for example, `origin2`) instead of guessing.
+  - For the **backend** (`breakfree-server`), prefer pushing the current branch to the remote the user specifies (for example, `pravee42`) instead of guessing.
+- If the user wants to change remotes (origin URLs, rename remotes, etc.), provide the exact git commands for them to run instead of executing or editing `.git/config` yourself.
+
