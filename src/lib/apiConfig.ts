@@ -1,29 +1,26 @@
 /**
  * API Configuration
  * Centralized API base URL configuration using environment variables
+ * 
+ * Single env var: NEXT_PUBLIC_BACKEND_URL
+ * - Set in .env for local dev (http://localhost:3001)
+ * - Set in Vercel env vars for production (e.g. https://chatapi-ntky.onrender.com)
+ * 
+ * NEXT_PUBLIC_ prefix makes it available in both client-side and server-side code.
  */
 
-// Determine if we're in development mode
-const isDevelopment = process.env.NODE_ENV === 'development';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
 
-// For client-side code in Next.js, we need NEXT_PUBLIC_ prefix
-// Use BACKEND_PROD_BASE_URL from .env file, or localhost for development
-export const API_BASE_URL = 
-  process.env.NEXT_PUBLIC_BACKEND_PROD_BASE_URL || 
-  (isDevelopment ? 'http://localhost:3001' : 'http://localhost:3001');
+// Base URL without /api suffix
+export const API_BASE_URL = BACKEND_URL;
 
 // API base URL with /api suffix for convenience
-export const API_BASE_URL_WITH_API = `${API_BASE_URL}/api`;
+export const API_BASE_URL_WITH_API = `${BACKEND_URL}/api`;
 
 /** Backend v1 routes (e.g. `/api/v1/reports/...`) */
-export const API_V1_BASE_URL = `${API_BASE_URL}/api/v1`;
+export const API_V1_BASE_URL = `${BACKEND_URL}/api/v1`;
 
-// For server-side code (API routes), we can use the env var directly without NEXT_PUBLIC_ prefix
-// Fallback to NEXT_PUBLIC_ version if direct version is not available
-// Use localhost for development if no env var is set
-export const SERVER_API_BASE_URL = 
-  process.env.BACKEND_PROD_BASE_URL || 
-  process.env.NEXT_PUBLIC_BACKEND_PROD_BASE_URL || 
-  (isDevelopment ? 'http://localhost:3001' : 'http://localhost:3001');
+// Server-side uses the same URL (NEXT_PUBLIC_ vars are available server-side too)
+export const SERVER_API_BASE_URL = BACKEND_URL;
 
-export const SERVER_API_BASE_URL_WITH_API = `${SERVER_API_BASE_URL}/api`;
+export const SERVER_API_BASE_URL_WITH_API = `${BACKEND_URL}/api`;

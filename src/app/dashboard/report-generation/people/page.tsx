@@ -149,20 +149,28 @@ const PeopleManagement = () => {
   const handleAddGroup = async (newGroup: Omit<Group, 'id'>) => {
     try {
       const token = getAuthToken();
+      // Filter participant IDs to only include those that exist in the current participants list
+      const validParticipantIds = (newGroup.members || []).filter(id =>
+        participants.some(p => p.id === id)
+      );
+      const payload = {
+        name: newGroup.name,
+        admin: newGroup.admin,
+        adminEmail: newGroup.adminEmail,
+        participantIds: validParticipantIds,
+      };
+      console.log('Sending to API:', payload);
+      console.log('Participants available:', participants);
       const res = await fetch(`${API_BASE_URL_WITH_API}/groups`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          name: newGroup.name,
-          admin: newGroup.admin,
-          adminEmail: newGroup.adminEmail,
-          participantIds: newGroup.members,
-        }),
+        body: JSON.stringify(payload),
       });
       const result = await res.json();
+      console.log('API response:', result);
       if (result.success) {
         fetchGroups();
       } else {
@@ -181,20 +189,28 @@ const PeopleManagement = () => {
         alert('You must be logged in to edit a group.');
         return;
       }
+      // Filter participant IDs to only include those that exist in the current participants list
+      const validParticipantIds = (groupData.members || []).filter(id =>
+        participants.some(p => p.id === id)
+      );
+      const payload = {
+        name: groupData.name,
+        admin: groupData.admin,
+        adminEmail: groupData.adminEmail,
+        participantIds: validParticipantIds,
+      };
+      console.log('Editing group - Sending to API:', payload);
+      console.log('Editing group - Participants available:', participants);
       const res = await fetch(`${API_BASE_URL_WITH_API}/groups/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          name: groupData.name,
-          admin: groupData.admin,
-          adminEmail: groupData.adminEmail,
-          participantIds: groupData.members,
-        }),
+        body: JSON.stringify(payload),
       });
       const result = await res.json();
+      console.log('Editing group - API response:', result);
       if (result.success) {
         fetchGroups(); // Refresh groups list
       } else {

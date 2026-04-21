@@ -72,7 +72,7 @@ export default function ChatContainer({ selectedPrompt }: { selectedPrompt: stri
     try {
       // API call to /chat endpoint
       const res = await axios.post(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/chat`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/chat`,
         { user_input: text },  // API expects { "user_input": "string" }
         {
           headers: {

@@ -50,7 +50,7 @@ const Page = () => {
 
     try {
       const res = await axios.post<ApiResponse>(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/generate-prompts`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/generate-prompts`,
         data || prompt,
         {
           headers: {
