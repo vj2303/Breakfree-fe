@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { API_V1_BASE_URL } from "@/lib/apiConfig";
@@ -107,7 +107,19 @@ function CompScores({ scoring }: { scoring: Record<string, ScoringEntry> }) {
 
 /* ─── Page Component ────────────────────────────────────────────────────── */
 
-export default function AIReportPage() {
+export default function AIReportPageWrapper() {
+  return (
+    <Suspense fallback={
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: "system-ui" }}>
+        <p style={{ color: "#6b7280", fontSize: 14 }}>Loading report...</p>
+      </div>
+    }>
+      <AIReportPage />
+    </Suspense>
+  );
+}
+
+function AIReportPage() {
   const { token } = useAuth();
   const params = useSearchParams();
   const participantId = params.get("participantId");
