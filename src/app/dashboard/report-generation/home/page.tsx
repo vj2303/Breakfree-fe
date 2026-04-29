@@ -828,9 +828,9 @@ const HomePage = () => {
 
         doc.setFontSize(12);
         doc.setTextColor(...COLORS.BLACK);
-        doc.text(score.participant.name.toUpperCase(), margin + 10, yPos + 22);
+        doc.text((score.participant?.name || "Unknown Participant").toUpperCase(), margin + 10, yPos + 22);
         doc.text(new Date().toLocaleDateString(), mid + 10, yPos + 22);
-        doc.text(score.assessmentCenter.name, margin + 10, yPos + 42);
+        doc.text(score.assessmentCenter?.name || "Unknown Center", margin + 10, yPos + 42);
 
         if (logo) {
           const logoH = 14;
@@ -859,7 +859,7 @@ const HomePage = () => {
         doc.setTextColor(...COLORS.DARK_GRAY);
         const introTxt = doc.splitTextToSize(
           htmlToPlainTextForPdf(
-            content.introduction || `Report for ${score.participant.name}.`
+            content.introduction || `Report for ${score.participant?.name || "Unknown Participant"}.`
           ),
           pageWidth - margin * 2
         );
@@ -1129,15 +1129,15 @@ const HomePage = () => {
           const r = await res.json();
           content = formatReportContentForPDF(
             r.data.reportContent,
-            score.participant.name,
-            score.assessmentCenter.name,
+            score.participant?.name || "Unknown Participant",
+            score.assessmentCenter?.name || "Unknown Center",
             score
           );
         } else {
           content = formatReportContentForPDF(
             {},
-            score.participant.name,
-            score.assessmentCenter.name,
+            score.participant?.name || "Unknown Participant",
+            score.assessmentCenter?.name || "Unknown Center",
             score
           );
         }
@@ -1758,10 +1758,10 @@ const HomePage = () => {
                   >
                     <div>
                       <div style={{ fontWeight: 600, fontSize: "16px" }}>
-                        {score.participant.name}
+                        {score.participant?.name || "Unknown Participant"}
                       </div>
                       <div style={{ fontSize: "13px", color: "#6b7280" }}>
-                        {score.assessmentCenter.name}
+                        {score.assessmentCenter?.name || "Unknown Center"}
                       </div>
                       <div style={{ fontSize: "12px", marginTop: "4px" }}>
                         Status:{" "}
@@ -1923,8 +1923,8 @@ const HomePage = () => {
                   );
                 }}
                 pages={reportPreviewPages.map(({ score, content }) => ({
-                  participantName: score.participant.name,
-                  assessmentCenterName: score.assessmentCenter.name,
+                  participantName: score.participant?.name || "Unknown Participant",
+                  assessmentCenterName: score.assessmentCenter?.name || "Unknown Center",
                   content,
                 }))}
               />
@@ -1968,7 +1968,7 @@ const HomePage = () => {
               }}
             >
               <h2 style={{ fontSize: "20px", fontWeight: 700, margin: 0 }}>
-                Edit Assessment: {selectedScore.participant.name}
+                Edit Assessment: {selectedScore.participant?.name || "Unknown Participant"}
               </h2>
               <button
                 onClick={() => !saving && setShowEditModal(false)}

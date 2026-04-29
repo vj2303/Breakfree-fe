@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { ReportStructureApi, ReportStructure } from '@/lib/reportStructureApi';
-import { Download, Search, ArrowLeft, ChevronRight } from 'lucide-react';
+import { Download, Search, ArrowLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 
 interface ParticipantReportsProps {
@@ -1183,6 +1183,12 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
     }
   };
 
+  const handleGenerateAIReport = (participant: ParticipantData, assessmentCenterId: string, _assessmentCenterName: string) => {
+    // Open the AI report page in a new tab — it calls the backend and renders the HTML report
+    const url = `/dashboard/report-generation/reports/ai-report?participantId=${participant.id}&assessmentCenterId=${assessmentCenterId}`;
+    window.open(url, '_blank');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">
@@ -1435,23 +1441,32 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
                                     {ac.displayName || ac.name}
                                   </div>
                                 </div>
-                        <button
-                                  onClick={() => handleDownloadReport(participant, ac.id)}
-                                  disabled={!selectedReportStructure || isDownloading}
-                          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-black border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                                  {isDownloadingThis ? (
-                            <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-300 border-t-black"></div>
-                              <span>Generating...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Download className="w-4 h-4" />
-                                      <span>Download Report</span>
-                            </>
-                          )}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleDownloadReport(participant, ac.id)}
+                            disabled={!selectedReportStructure || isDownloading}
+                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-black border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isDownloadingThis ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-300 border-t-black"></div>
+                                <span>Generating...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Download className="w-4 h-4" />
+                                <span>Download Report</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleGenerateAIReport(participant, ac.id, ac.displayName || ac.name)}
+                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-black rounded-lg hover:bg-gray-800 transition-colors"
+                          >
+                            <Sparkles className="w-4 h-4" />
+                            <span>AI Report</span>
+                          </button>
+                        </div>
                               </div>
                             );
                           })}
@@ -1473,6 +1488,7 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
           </div>
         </div>
       )}
+
     </div>
   );
 };
