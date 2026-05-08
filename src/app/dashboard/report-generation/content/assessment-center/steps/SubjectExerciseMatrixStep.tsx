@@ -128,7 +128,26 @@ const SubjectExerciseMatrixStep: React.FC = () => {
           return prev;
         }
 
-        // Otherwise, initialize new matrix to all false
+        // Dimensions changed - preserve existing toggle values from whichever source has data
+        // (formData.matrix from API/persisted state, or local prev state from user interaction)
+        const sourceMatrix = (existingMatrix && Array.isArray(existingMatrix) && existingMatrix.length > 0)
+          ? existingMatrix
+          : (prev.length > 0 ? prev : null);
+
+        if (sourceMatrix) {
+          console.log('[SubjectExerciseMatrixStep] Resizing matrix while preserving existing toggles', {
+            from: `${sourceMatrix.length}x${sourceMatrix[0]?.length || 0}`,
+            to: `${expectedRows}x${expectedCols}`,
+          });
+          // Build new matrix preserving existing values where indices overlap
+          return Array.from({ length: expectedRows }, (_, rowIdx) =>
+            Array.from({ length: expectedCols }, (_, colIdx) =>
+              sourceMatrix[rowIdx]?.[colIdx] ?? false
+            )
+          );
+        }
+
+        // No existing data at all - initialize new matrix to all false
         console.log('[SubjectExerciseMatrixStep] Initializing new matrix (all false)');
         return finalCompetencies.map((): boolean[] => activities.map((): boolean => false));
       });

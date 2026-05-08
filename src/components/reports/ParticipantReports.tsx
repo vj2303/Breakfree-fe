@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { ReportStructureApi, ReportStructure } from '@/lib/reportStructureApi';
-import { Download, Search, ArrowLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { Download, Search, ArrowLeft, ChevronRight, Sparkles, Upload } from 'lucide-react';
+import { API_V1_BASE_URL } from '@/lib/apiConfig';
 import { jsPDF } from 'jspdf';
 
 interface ParticipantReportsProps {
@@ -46,6 +47,10 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
   const [showReportStructureSelector, setShowReportStructureSelector] = useState(false);
   const [participantsWithAssessmentCenters, setParticipantsWithAssessmentCenters] = useState<Map<string, AssessmentCenterData[]>>(new Map());
   const [loadingAssessmentCenters, setLoadingAssessmentCenters] = useState<Set<string>>(new Set());
+  const [uploadingReadiness, setUploadingReadiness] = useState<string | null>(null); // AC id being uploaded
+  const [readinessUploadStatus, setReadinessUploadStatus] = useState<{ acId: string; message: string; type: 'success' | 'error' } | null>(null);
+  const readinessFileRef = React.useRef<HTMLInputElement>(null);
+  const [pendingUploadACId, setPendingUploadACId] = useState<string | null>(null);
 
   // Fetch groups and report structures
   const fetchData = useCallback(async () => {
@@ -1189,6 +1194,59 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
     window.open(url, '_blank');
   };
 
+  const handleUploadReadinessScores = async (assessmentCenterId: string, file: File) => {
+    if (!token) return;
+    setUploadingReadiness(assessmentCenterId);
+    setReadinessUploadStatus(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('assessmentCenterId', assessmentCenterId);
+
+      const response = await fetch(`${API_V1_BASE_URL}/readiness-scores/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Upload failed');
+      }
+
+      setReadinessUploadStatus({
+        acId: assessmentCenterId,
+        message: `Uploaded: ${data.data.savedCount} saved, ${data.data.skippedCount} skipped`,
+        type: 'success',
+      });
+    } catch (err) {
+      setReadinessUploadStatus({
+        acId: assessmentCenterId,
+        message: err instanceof Error ? err.message : 'Upload failed',
+        type: 'error',
+      });
+    } finally {
+      setUploadingReadiness(null);
+    }
+  };
+
+  const triggerReadinessUpload = (assessmentCenterId: string) => {
+    setPendingUploadACId(assessmentCenterId);
+    readinessFileRef.current?.click();
+  };
+
+  const onReadinessFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && pendingUploadACId) {
+      handleUploadReadinessScores(pendingUploadACId, file);
+    }
+    e.target.value = '';
+    setPendingUploadACId(null);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">
@@ -1207,6 +1265,15 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
 
   return (
     <div className="space-y-4">
+      {/* Hidden file input for readiness score upload */}
+      <input
+        type="file"
+        ref={readinessFileRef}
+        onChange={onReadinessFileChange}
+        accept=".xlsx,.xls"
+        className="hidden"
+      />
+
       {/* Report Structure Selector */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
         <div className="px-4 py-3 border-b border-gray-200">
@@ -1460,6 +1527,23 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
                             )}
                           </button>
                           <button
+                            onClick={() => triggerReadinessUpload(ac.id)}
+                            disabled={uploadingReadiness === ac.id}
+                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-black border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+                          >
+                            {uploadingReadiness === ac.id ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-300 border-t-black"></div>
+                                <span>Uploading...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="w-4 h-4" />
+                                <span>Readiness Scores</span>
+                              </>
+                            )}
+                          </button>
+                          <button
                             onClick={() => handleGenerateAIReport(participant, ac.id, ac.displayName || ac.name)}
                             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-black rounded-lg hover:bg-gray-800 transition-colors"
                           >
@@ -1467,6 +1551,15 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
                             <span>AI Report</span>
                           </button>
                         </div>
+                        {readinessUploadStatus && readinessUploadStatus.acId === ac.id && (
+                          <div className={`mt-2 text-xs px-3 py-1.5 rounded ${
+                            readinessUploadStatus.type === 'success'
+                              ? 'bg-green-50 text-green-700 border border-green-200'
+                              : 'bg-red-50 text-red-700 border border-red-200'
+                          }`}>
+                            {readinessUploadStatus.message}
+                          </div>
+                        )}
                               </div>
                             );
                           })}

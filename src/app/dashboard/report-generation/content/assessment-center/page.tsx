@@ -129,6 +129,23 @@ export default function AssessmentCenterPage() {
     window.location.href = editUrl;
   };
 
+  // Clean existing assignments: filter out participants whose records were deleted
+  const cleanAssignments = (rawAssignments: any[]) =>
+    rawAssignments
+      .map((assignment: any) => ({
+        groupId: assignment.groupId,
+        participants: (assignment.participants || [])
+          .filter((p: any) => p.participant)
+          .map((p: any) => ({
+            participantId: p.participantId,
+            activities: (p.activities || []).map((act: any) => ({
+              activityId: act.activityId,
+              assessorIds: act.assessorIds || [],
+            })),
+          })),
+      }))
+      .filter((a: any) => a.participants.length > 0);
+
   // Handle assign participants
   const handleAssignParticipants = async (center: any) => {
     setActiveDropdown(null);
@@ -266,7 +283,7 @@ export default function AssessmentCenterPage() {
               setSelectedCenterForAssign({
                 id: center.id,
                 activities: activitiesWithDetails,
-                assignments: result.data.assignments || [],
+                assignments: cleanAssignments(result.data.assignments || []),
               });
               setAssignModalOpen(true);
             } catch (error) {
@@ -292,7 +309,7 @@ export default function AssessmentCenterPage() {
                   displayName: act.displayName || "Unnamed Activity",
                   name: "Unnamed Activity",
                 })),
-                assignments: result.data.assignments || [],
+                assignments: cleanAssignments(result.data.assignments || []),
               });
               setAssignModalOpen(true);
             }
@@ -300,7 +317,7 @@ export default function AssessmentCenterPage() {
             setSelectedCenterForAssign({
               id: center.id,
               activities: [],
-              assignments: result.data.assignments || [],
+              assignments: cleanAssignments(result.data.assignments || []),
             });
             setAssignModalOpen(true);
           }

@@ -64,12 +64,14 @@ interface InputData {
   participant: Record<string, string | undefined>;
   programme: { name: string; activities: string[] };
   scoring: Record<string, ScoringEntry>;
+  readiness_scores?: Record<string, number>;
 }
 interface AIReportData {
   participant: ParticipantInfo;
   assessmentCenter: ACInfo;
   input: InputData;
   report: { profiles: ProfilesData; insights: InsightsData; recommendations: RecsData };
+  readinessScores?: Record<string, number> | null;
 }
 
 /* ─── Helpers ───────────────────────────────────────────────────────────── */
@@ -96,12 +98,13 @@ function barPct(s: number, max = 5) {
   return `${Math.min(100, (s / max) * 100)}%`;
 }
 
-function CompScores({ scoring }: { scoring: Record<string, ScoringEntry> }) {
+function CompScores({ scoring, readinessScores }: { scoring: Record<string, ScoringEntry>; readinessScores?: Record<string, number> | null }) {
   return Object.entries(scoring).map(([name, subs]) => {
     const entries = Object.entries(subs);
     const avg = entries.length > 0 ? entries.reduce((s, [, v]) => s + v.score, 0) / entries.length : 0;
     const score = Math.round(avg * 10) / 10;
-    return { name, score, subs: entries.map(([n, v]) => ({ name: n, score: v.score })) };
+    const readiness = readinessScores?.[name] ?? null;
+    return { name, score, readiness, subs: entries.map(([n, v]) => ({ name: n, score: v.score })) };
   });
 }
 
@@ -182,7 +185,7 @@ function AIReportPage() {
   const { participant, assessmentCenter, input, report } = data;
   const { profiles, insights, recommendations } = report;
   const acName = assessmentCenter.displayName || assessmentCenter.name;
-  const competencies = CompScores({ scoring: input.scoring });
+  const competencies = CompScores({ scoring: input.scoring, readinessScores: data.readinessScores || input.readiness_scores });
 
   return (
     <>
@@ -420,53 +423,69 @@ function AIReportPage() {
           </p>
 
           {/* Bar chart */}
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 20, marginBottom: 20 }}>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 16, marginBottom: 12, fontSize: 11 }}>
-              <span><span style={{ display: "inline-block", width: 12, height: 12, background: "#1B2B4B", borderRadius: 2, marginRight: 4, verticalAlign: "middle" }} />Application (observed)</span>
-              <span><span style={{ display: "inline-block", width: 12, height: 12, background: "#ADC6DB", borderRadius: 2, marginRight: 4, verticalAlign: "middle" }} />Readiness (SJT)</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 0, height: 180 }}>
-              {competencies.map((c) => {
-                const app = c.score;
-                const rdy = Math.round(c.score);
-                return (
-                  <div key={c.name} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                    <div style={{ display: "flex", gap: 4, alignItems: "flex-end", height: 160 }}>
-                      <div style={{ width: 24, background: "#1B2B4B", borderRadius: "3px 3px 0 0", height: `${(app / 5) * 100}%`, position: "relative" }}>
-                        <span style={{ position: "absolute", top: -16, left: "50%", transform: "translateX(-50%)", fontSize: 10, fontWeight: 700, color: "#1B2B4B" }}>{app.toFixed(1)}</span>
-                      </div>
-                      <div style={{ width: 24, background: "#ADC6DB", borderRadius: "3px 3px 0 0", height: `${(rdy / 5) * 100}%`, position: "relative" }}>
-                        <span style={{ position: "absolute", top: -16, left: "50%", transform: "translateX(-50%)", fontSize: 10, fontWeight: 700, color: "#6b7280" }}>{rdy}</span>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: 10, color: "#374151", textAlign: "center", marginTop: 8, lineHeight: 1.2, maxWidth: 100 }}>{c.name}</div>
+          {(() => {
+            const hasReadiness = competencies.some(c => c.readiness !== null);
+            return (
+              <>
+                {!hasReadiness && (
+                  <div style={{ background: "#FFFBEB", border: "1px solid #F59E0B", borderRadius: 6, padding: 12, marginBottom: 16, fontSize: 12, color: "#92400E" }}>
+                    No readiness scores uploaded for this participant. The readiness column below shows &quot;N/A&quot;. Upload an Excel sheet with readiness scores to enable full gap analysis.
                   </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Gap table */}
-          <div style={{ borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 0.8fr 2.5fr", background: "#1B2B4B", color: "#fff", padding: "10px 16px", fontSize: 10, fontWeight: 700, letterSpacing: 1 }}>
-              <div>COMPETENCY</div><div>APPLICATION</div><div>READINESS</div><div>GAP</div><div>IMPLICATION</div>
-            </div>
-            {competencies.map((c) => {
-              const app = c.score;
-              const rdy = Math.round(c.score);
-              const gap = app - rdy;
-              const impl = Math.abs(gap) <= 0.3 ? "Well aligned — sustain current approach" : gap > 0 ? "Behaviour ahead — build theoretical grounding" : "Knowledge ahead — focus on practical application";
-              return (
-                <div key={c.name} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 0.8fr 2.5fr", padding: "10px 16px", borderBottom: "1px solid #f3f4f6", fontSize: 12 }}>
-                  <div>{c.name}</div>
-                  <div style={{ fontWeight: 700 }}>{app.toFixed(1)}</div>
-                  <div style={{ fontWeight: 700 }}>{rdy}</div>
-                  <div style={{ color: gap < -0.3 ? "#C44E52" : "#374151", fontWeight: 700 }}>{gap.toFixed(1)}</div>
-                  <div style={{ fontSize: 11, color: "#6b7280" }}>{impl}</div>
+                )}
+                <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 20, marginBottom: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 16, marginBottom: 12, fontSize: 11 }}>
+                    <span><span style={{ display: "inline-block", width: 12, height: 12, background: "#1B2B4B", borderRadius: 2, marginRight: 4, verticalAlign: "middle" }} />Application (observed)</span>
+                    <span><span style={{ display: "inline-block", width: 12, height: 12, background: "#ADC6DB", borderRadius: 2, marginRight: 4, verticalAlign: "middle" }} />Readiness (SJT)</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: 0, height: 180 }}>
+                    {competencies.map((c) => {
+                      const app = c.score;
+                      const rdy = c.readiness;
+                      return (
+                        <div key={c.name} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
+                          <div style={{ display: "flex", gap: 4, alignItems: "flex-end", height: 160 }}>
+                            <div style={{ width: 24, background: "#1B2B4B", borderRadius: "3px 3px 0 0", height: `${(app / 5) * 100}%`, position: "relative" }}>
+                              <span style={{ position: "absolute", top: -16, left: "50%", transform: "translateX(-50%)", fontSize: 10, fontWeight: 700, color: "#1B2B4B" }}>{app.toFixed(1)}</span>
+                            </div>
+                            {rdy !== null && (
+                              <div style={{ width: 24, background: "#ADC6DB", borderRadius: "3px 3px 0 0", height: `${(rdy / 5) * 100}%`, position: "relative" }}>
+                                <span style={{ position: "absolute", top: -16, left: "50%", transform: "translateX(-50%)", fontSize: 10, fontWeight: 700, color: "#6b7280" }}>{rdy.toFixed(1)}</span>
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 10, color: "#374151", textAlign: "center", marginTop: 8, lineHeight: 1.2, maxWidth: 100 }}>{c.name}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              );
-            })}
-          </div>
+
+                {/* Gap table */}
+                <div style={{ borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 0.8fr 2.5fr", background: "#1B2B4B", color: "#fff", padding: "10px 16px", fontSize: 10, fontWeight: 700, letterSpacing: 1 }}>
+                    <div>COMPETENCY</div><div>APPLICATION</div><div>READINESS</div><div>GAP</div><div>IMPLICATION</div>
+                  </div>
+                  {competencies.map((c) => {
+                    const app = c.score;
+                    const rdy = c.readiness;
+                    const gap = rdy !== null ? app - rdy : null;
+                    const impl = rdy === null
+                      ? "No readiness data"
+                      : Math.abs(gap!) <= 0.3 ? "Well aligned — sustain current approach" : gap! > 0 ? "Behaviour ahead — build theoretical grounding" : "Knowledge ahead — focus on practical application";
+                    return (
+                      <div key={c.name} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 0.8fr 2.5fr", padding: "10px 16px", borderBottom: "1px solid #f3f4f6", fontSize: 12 }}>
+                        <div>{c.name}</div>
+                        <div style={{ fontWeight: 700 }}>{app.toFixed(1)}</div>
+                        <div style={{ fontWeight: 700 }}>{rdy !== null ? rdy.toFixed(1) : "N/A"}</div>
+                        <div style={{ color: gap !== null && gap < -0.3 ? "#C44E52" : "#374151", fontWeight: 700 }}>{gap !== null ? gap.toFixed(1) : "—"}</div>
+                        <div style={{ fontSize: 11, color: "#6b7280" }}>{impl}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })()}
         </div>
 
         {/* ─── PAGES 7-9: DETAILED COMPETENCY PROFILES ───────────────── */}
