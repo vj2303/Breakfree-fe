@@ -238,8 +238,19 @@ const ParticipantsComponent: React.FC<ParticipantsComponentProps> = (props) => {
         console.error("❌ Create operation failed:", data);
         throw new Error(data.message || "Failed to create participant");
       }
-    } catch {
-      // Error is already handled in createParticipant
+    } catch (err) {
+      // Surface the error to the user (banner + alert) and re-throw so the
+      // caller can keep the modal open
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to create participant. Please try again.";
+      console.error("❌ createParticipant error:", message);
+      setError(message);
+      if (typeof window !== "undefined") {
+        window.alert(`Could not add participant:\n\n${message}`);
+      }
+      throw err;
     } finally {
       setIsSubmitting(false);
     }
@@ -280,8 +291,17 @@ const ParticipantsComponent: React.FC<ParticipantsComponentProps> = (props) => {
       } else {
         throw new Error(data.message || "Failed to update participant");
       }
-    } catch {
-      // Error is already handled in updateParticipant
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to update participant. Please try again.";
+      console.error("❌ updateParticipant error:", message);
+      setError(message);
+      if (typeof window !== "undefined") {
+        window.alert(`Could not update participant:\n\n${message}`);
+      }
+      throw err;
     } finally {
       setIsSubmitting(false);
     }
@@ -316,8 +336,17 @@ const ParticipantsComponent: React.FC<ParticipantsComponentProps> = (props) => {
       } else {
         throw new Error(data.message || "Failed to delete participant");
       }
-    } catch {
-      // Error is already handled in deleteParticipant
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to delete participant. Please try again.";
+      console.error("❌ deleteParticipant error:", message);
+      setError(message);
+      if (typeof window !== "undefined") {
+        window.alert(`Could not delete participant:\n\n${message}`);
+      }
+      throw err;
     }
   };
 
@@ -358,6 +387,7 @@ const ParticipantsComponent: React.FC<ParticipantsComponentProps> = (props) => {
   }, [searchTerm, fetchParticipants]);
 
   const handleAddParticipant = async () => {
+    // ─── Client-side validations ────────────────────────────────────
     if (
       !newParticipant.name ||
       !newParticipant.email ||
@@ -368,20 +398,35 @@ const ParticipantsComponent: React.FC<ParticipantsComponentProps> = (props) => {
       !newParticipant.department ||
       !newParticipant.division
     ) {
-      setError("Please fill in all required fields");
+      const msg = "Please fill in all required fields";
+      setError(msg);
+      window.alert(msg);
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newParticipant.email.trim())) {
+      const msg = "Please enter a valid email address (e.g. name@example.com)";
+      setError(msg);
+      window.alert(msg);
       return;
     }
 
     if (!agreeToTerms) {
-      setError("Please agree to the Terms and Privacy Policies");
+      const msg = "Please agree to the Terms and Privacy Policies";
+      setError(msg);
+      window.alert(msg);
       return;
     }
+
+    // Clear any previous errors before attempting create
+    setError(null);
 
     try {
       // Prepare data - only include batchNo if it has a value
       const participantData: any = {
-        name: newParticipant.name,
-        email: newParticipant.email,
+        name: newParticipant.name.trim(),
+        email: newParticipant.email.trim().toLowerCase(),
         designation: newParticipant.designation,
         role: newParticipant.role,
         managerName: newParticipant.managerName,
@@ -394,7 +439,15 @@ const ParticipantsComponent: React.FC<ParticipantsComponentProps> = (props) => {
         participantData.batchNo = newParticipant.batchNo;
       }
 
-      await createParticipant(participantData);
+      // createParticipant now throws on failure (after showing alert + setError)
+      const created = await createParticipant(participantData);
+      if (!created) {
+        // Defensive: createParticipant returned undefined (shouldn't happen
+        // after our fix, but guards against future regressions)
+        return;
+      }
+
+      // SUCCESS — reset form and close modal
       setNewParticipant({
         name: "",
         email: "",
@@ -414,7 +467,8 @@ const ParticipantsComponent: React.FC<ParticipantsComponentProps> = (props) => {
         props.onAddParticipant(participantData);
       }
     } catch {
-      // Error is already handled in createParticipant
+      // Modal stays open so user can fix the email and retry
+      // (createParticipant already showed the alert + set the error banner)
     }
   };
 
@@ -430,15 +484,26 @@ const ParticipantsComponent: React.FC<ParticipantsComponentProps> = (props) => {
       !newParticipant.department ||
       !newParticipant.division
     ) {
-      setError("Please fill in all required fields");
+      const msg = "Please fill in all required fields";
+      setError(msg);
+      window.alert(msg);
       return;
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newParticipant.email.trim())) {
+      const msg = "Please enter a valid email address (e.g. name@example.com)";
+      setError(msg);
+      window.alert(msg);
+      return;
+    }
+
+    setError(null);
+
     try {
-      // Prepare data - only include batchNo if it has a value
       const participantData: any = {
-        name: newParticipant.name,
-        email: newParticipant.email,
+        name: newParticipant.name.trim(),
+        email: newParticipant.email.trim().toLowerCase(),
         designation: newParticipant.designation,
         role: newParticipant.role,
         managerName: newParticipant.managerName,
@@ -451,7 +516,9 @@ const ParticipantsComponent: React.FC<ParticipantsComponentProps> = (props) => {
         participantData.batchNo = newParticipant.batchNo;
       }
 
-      await updateParticipant(editingParticipant.id, participantData);
+      const updated = await updateParticipant(editingParticipant.id, participantData);
+      if (!updated) return;
+
       setNewParticipant({
         name: "",
         email: "",
@@ -471,7 +538,8 @@ const ParticipantsComponent: React.FC<ParticipantsComponentProps> = (props) => {
         props.onEditParticipant(editingParticipant.id, participantData);
       }
     } catch {
-      // Error is already handled in updateParticipant
+      // Modal stays open so user can fix the email and retry.
+      // (updateParticipant already showed the alert + set the error banner.)
     }
   };
 
@@ -503,6 +571,7 @@ const ParticipantsComponent: React.FC<ParticipantsComponentProps> = (props) => {
       department: participant.department,
       division: participant.division,
     });
+    setError(null);
     setShowEditParticipant(true);
   };
 
@@ -616,7 +685,10 @@ const ParticipantsComponent: React.FC<ParticipantsComponentProps> = (props) => {
           />
           <button
             className="bg-gray-800 text-white px-4 py-2 rounded-full shadow disabled:opacity-50"
-            onClick={() => setShowAddParticipant(true)}
+            onClick={() => {
+              setError(null);
+              setShowAddParticipant(true);
+            }}
             disabled={isSubmitting}
           >
             + Add Participant
@@ -857,6 +929,21 @@ const ParticipantsComponent: React.FC<ParticipantsComponentProps> = (props) => {
             <h3 className="font-bold mb-4 text-xl text-black">
               Add Participant
             </h3>
+            {error && (
+              <div className="bg-red-50 border border-red-300 text-red-800 px-4 py-3 rounded-lg mb-4 flex items-start gap-3">
+                <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                <div className="flex-1 text-sm font-medium">{error}</div>
+                <button
+                  type="button"
+                  onClick={() => setError(null)}
+                  className="text-red-700 hover:text-red-900 text-xs underline"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1 text-black">
@@ -1074,6 +1161,21 @@ const ParticipantsComponent: React.FC<ParticipantsComponentProps> = (props) => {
             <h3 className="font-bold mb-4 text-xl text-black">
               Edit Participant
             </h3>
+            {error && (
+              <div className="bg-red-50 border border-red-300 text-red-800 px-4 py-3 rounded-lg mb-4 flex items-start gap-3">
+                <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                <div className="flex-1 text-sm font-medium">{error}</div>
+                <button
+                  type="button"
+                  onClick={() => setError(null)}
+                  className="text-red-700 hover:text-red-900 text-xs underline"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1 text-black">

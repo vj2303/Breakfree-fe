@@ -192,6 +192,17 @@ const HomePage = () => {
   }> | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
+  // Reset-assessment state
+  const [resetTarget, setResetTarget] = useState<{
+    participantId: string;
+    participantName: string;
+    assessmentCenterId: string;
+    assessmentCenterName: string;
+  } | null>(null);
+  const [resetIncludeScores, setResetIncludeScores] = useState(true);
+  const [resetting, setResetting] = useState(false);
+  const [resetSuccessMsg, setResetSuccessMsg] = useState<string | null>(null);
+
   // --- HELPERS ---
   const getAuthToken = () => {
     if (typeof window !== "undefined") {
@@ -1233,6 +1244,53 @@ const HomePage = () => {
     }
   };
 
+  // ─── Reset Assessment ──────────────────────────────────────────────
+  const handleConfirmReset = async () => {
+    if (!resetTarget) return;
+    setResetting(true);
+    setError(null);
+    setResetSuccessMsg(null);
+    try {
+      const res = await fetch(`${API_BASE_URL_WITH_API}/assignments/reset`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${getAuthToken()}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          participantId: resetTarget.participantId,
+          assessmentCenterId: resetTarget.assessmentCenterId,
+          includeAssessorScores: resetIncludeScores,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || `Reset failed (${res.status})`);
+      }
+      const submissions = data.data?.deletedSubmissions ?? 0;
+      const scores = data.data?.deletedAssessorScores ?? 0;
+      setResetSuccessMsg(
+        `Reset complete for ${resetTarget.participantName} — deleted ${submissions} submission(s)` +
+          (resetIncludeScores ? ` and ${scores} assessor score row(s).` : ".")
+      );
+      setResetTarget(null);
+      // Re-fetch the participant progress so the UI reflects the wipe.
+      // selectedGroup is set; the existing useEffect re-runs on group change,
+      // so just nudge it by triggering a refetch via setting it again.
+      if (selectedGroup) {
+        const g = selectedGroup;
+        setSelectedGroup(null);
+        setTimeout(() => setSelectedGroup(g), 0);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to reset assessment";
+      setError(msg);
+      if (typeof window !== "undefined") window.alert(`Reset failed:\n\n${msg}`);
+    } finally {
+      setResetting(false);
+    }
+  };
+
   return (
     <div
       style={{
@@ -1654,18 +1712,45 @@ const HomePage = () => {
                                 idx > 0 ? "1px solid #f3f4f6" : undefined,
                             }}
                           >
-                            <div style={{ fontSize: "13px", color: "#374151" }}>
+                            <div style={{ fontSize: "13px", color: "#374151", flex: 1, minWidth: "180px" }}>
                               {centerLabel}
                             </div>
-                            <div
-                              style={{
-                                fontSize: "13px",
-                                fontWeight: 500,
-                                color: done ? "#15803d" : "#c2410c",
-                              }}
-                            >
-                              {a.submittedActivities} / {a.totalActivities}{" "}
-                              activities · {a.completionPercentage}%
+                            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                              <div
+                                style={{
+                                  fontSize: "13px",
+                                  fontWeight: 500,
+                                  color: done ? "#15803d" : "#c2410c",
+                                }}
+                              >
+                                {a.submittedActivities} / {a.totalActivities}{" "}
+                                activities · {a.completionPercentage}%
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setResetIncludeScores(true);
+                                  setResetTarget({
+                                    participantId: row.participantId,
+                                    participantName: row.name,
+                                    assessmentCenterId: a.assessmentCenter.id,
+                                    assessmentCenterName: centerLabel,
+                                  });
+                                }}
+                                title="Reset this participant's assessment so they can retake it"
+                                style={{
+                                  padding: "5px 12px",
+                                  fontSize: "12px",
+                                  fontWeight: 500,
+                                  background: "#fff",
+                                  color: "#b91c1c",
+                                  border: "1px solid #fca5a5",
+                                  borderRadius: "6px",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Reset
+                              </button>
                             </div>
                           </div>
                         );
@@ -2190,6 +2275,172 @@ const HomePage = () => {
                 }}
               >
                 {saving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- TOAST: RESET SUCCESS --- */}
+      {resetSuccessMsg && (
+        <div
+          style={{
+            position: "fixed",
+            top: 16,
+            right: 16,
+            zIndex: 200,
+            background: "#ecfdf5",
+            border: "1px solid #6ee7b7",
+            color: "#065f46",
+            padding: "12px 16px",
+            borderRadius: 8,
+            maxWidth: 380,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 8,
+          }}
+        >
+          <span style={{ fontSize: 18, lineHeight: 1 }}>✓</span>
+          <div style={{ flex: 1, fontSize: 13, lineHeight: 1.5 }}>{resetSuccessMsg}</div>
+          <button
+            type="button"
+            onClick={() => setResetSuccessMsg(null)}
+            style={{ background: "transparent", border: "none", cursor: "pointer", color: "#065f46", fontSize: 18, lineHeight: 1 }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* --- MODAL: CONFIRM RESET ASSESSMENT --- */}
+      {resetTarget && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+          onClick={() => !resetting && setResetTarget(null)}
+        >
+          <div
+            style={{
+              background: "white",
+              width: "100%",
+              maxWidth: 480,
+              borderRadius: 12,
+              padding: 24,
+              boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: "50%",
+                  background: "#fee2e2",
+                  color: "#b91c1c",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 22,
+                  fontWeight: 700,
+                }}
+              >
+                !
+              </div>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#111" }}>
+                Reset Assessment
+              </h3>
+            </div>
+
+            <p style={{ fontSize: 14, color: "#374151", margin: "0 0 12px" }}>
+              You are about to reset <strong>{resetTarget.participantName}</strong>&apos;s
+              assessment for <strong>{resetTarget.assessmentCenterName}</strong>.
+            </p>
+
+            <div
+              style={{
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                borderRadius: 8,
+                padding: "10px 12px",
+                fontSize: 13,
+                color: "#7f1d1d",
+                marginBottom: 16,
+                lineHeight: 1.5,
+              }}
+            >
+              This will permanently delete all of their submissions for this assessment
+              so they can take it again. <strong>This cannot be undone.</strong>
+            </div>
+
+            <label
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 8,
+                fontSize: 13,
+                color: "#374151",
+                marginBottom: 20,
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={resetIncludeScores}
+                onChange={e => setResetIncludeScores(e.target.checked)}
+                disabled={resetting}
+                style={{ marginTop: 2 }}
+              />
+              <span>
+                Also delete existing assessor scores for this participant
+                <span style={{ display: "block", color: "#6b7280", fontSize: 12, marginTop: 2 }}>
+                  Recommended — otherwise the old scores stay in the report.
+                </span>
+              </span>
+            </label>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setResetTarget(null)}
+                disabled={resetting}
+                style={{
+                  padding: "8px 16px",
+                  background: "#fff",
+                  border: "1px solid #d1d5db",
+                  borderRadius: 6,
+                  fontSize: 13,
+                  cursor: resetting ? "not-allowed" : "pointer",
+                  color: "#374151",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmReset}
+                disabled={resetting}
+                style={{
+                  padding: "8px 18px",
+                  background: resetting ? "#fca5a5" : "#dc2626",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 6,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: resetting ? "not-allowed" : "pointer",
+                }}
+              >
+                {resetting ? "Resetting..." : "Yes, reset assessment"}
               </button>
             </div>
           </div>

@@ -269,6 +269,9 @@ export default function AssessmentCenterPage() {
                   activityContent: act.activityId || act.id, // This is the ID used in the select
                   displayName: displayName,
                   name: activityName,
+                  // Carry through the specific sub-type (GD/ROLEPLAY/CASE_STUDY) so
+                  // the label shows "Group Discussion" instead of just "Case Study".
+                  interactiveActivityType: activityDetail?.interactiveActivityType,
                 };
 
                 console.log("Mapping activity:", {
@@ -308,6 +311,7 @@ export default function AssessmentCenterPage() {
                   activityContent: act.activityId || act.id,
                   displayName: act.displayName || "Unnamed Activity",
                   name: "Unnamed Activity",
+                  interactiveActivityType: act.interactiveActivityType,
                 })),
                 assignments: cleanAssignments(result.data.assignments || []),
               });

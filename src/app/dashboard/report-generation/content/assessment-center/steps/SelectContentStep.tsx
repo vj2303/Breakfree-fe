@@ -317,7 +317,16 @@ const SelectContentStep: React.FC = () => {
                     console.log(`[SelectContentStep] Activity content changed for idx ${idx}:`, e.target.value);
                     const newActivities = [...(formData.activities || [])];
                     if (newActivities[idx]) {
-                      newActivities[idx] = { ...newActivities[idx], activityContent: e.target.value };
+                      // Also persist interactiveActivityType from the picked option,
+                      // so downstream steps (ParticipantAssessorManagementStep) can
+                      // show "Group Discussion" / "Roleplay" / "Case Study" correctly.
+                      const opts = contentOptions[activity.activityType] || [];
+                      const picked = opts.find(o => o.value === e.target.value);
+                      newActivities[idx] = {
+                        ...newActivities[idx],
+                        activityContent: e.target.value,
+                        interactiveActivityType: picked?.interactiveActivityType,
+                      };
                       updateFormData('activities', newActivities);
                     }
                   }}

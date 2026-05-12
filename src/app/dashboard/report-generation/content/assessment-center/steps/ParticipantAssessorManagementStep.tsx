@@ -5,9 +5,12 @@ import Select, { StylesConfig, GroupBase, MultiValue } from 'react-select';
 import { Users, UserCheck, Activity, ChevronDown, CheckCircle2, AlertCircle, X, Loader2 } from 'lucide-react';
 
 import { API_BASE_URL_WITH_API } from '../../../../../../lib/apiConfig';
+import { getActivityTypeLabel } from '../../../../../../lib/activityTypeLabel';
 
 const GROUPS_API = `${API_BASE_URL_WITH_API}/groups?page=1&limit=10&search=`;
 const ASSESSORS_API = `${API_BASE_URL_WITH_API}/assessors?page=1&limit=10&search=`;
+const CASE_STUDIES_API = `${API_BASE_URL_WITH_API}/case-studies?page=1&limit=200`;
+const INBOX_ACTIVITIES_API = `${API_BASE_URL_WITH_API}/inbox-activities?page=1&limit=200`;
 
 // Define types
 interface Participant {
@@ -54,6 +57,10 @@ interface FormActivity {
   id?: string;
   displayName?: string;
   name?: string;
+  // Sub-type for case-study activities: 'GD' | 'ROLEPLAY' | 'CASE_STUDY'
+  // May be missing on activities loaded from existing assessment centers,
+  // in which case we fall back to the activityTypeMap fetched below.
+  interactiveActivityType?: string;
 }
 
 type OptionType = { value: string; label: string };
@@ -154,6 +161,11 @@ const ParticipantAssessorManagementStep: React.FC = () => {
   const [error, setError] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [expandedParticipants, setExpandedParticipants] = useState<Set<string>>(new Set());
+  // Map: activityId → interactiveActivityType (e.g. 'GD' | 'ROLEPLAY' | 'CASE_STUDY').
+  // Filled from case-studies / inbox-activities endpoints so that activities
+  // loaded from existing assessment centers (which don't carry this field)
+  // still render the correct label ("Group Discussion" vs "Case Study").
+  const [activityTypeMap, setActivityTypeMap] = useState<Record<string, string>>({});
 
   // Fetch assessors on mount
   useEffect(() => {
@@ -177,6 +189,32 @@ const ParticipantAssessorManagementStep: React.FC = () => {
       }
     };
     fetchAssessors();
+  }, [token]);
+
+  // Fetch case-studies + inbox-activities to build activityId → interactiveActivityType map
+  useEffect(() => {
+    if (!token) return;
+    const buildMap = async () => {
+      try {
+        const [csRes, iaRes] = await Promise.all([
+          fetch(CASE_STUDIES_API, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(INBOX_ACTIVITIES_API, { headers: { Authorization: `Bearer ${token}` } }),
+        ]);
+        const csData = csRes.ok ? await csRes.json() : null;
+        const iaData = iaRes.ok ? await iaRes.json() : null;
+        const map: Record<string, string> = {};
+        (csData?.data?.caseStudies || []).forEach((cs: { id?: string; interactiveActivityType?: string }) => {
+          if (cs.id && cs.interactiveActivityType) map[cs.id] = cs.interactiveActivityType;
+        });
+        (iaData?.data?.inboxActivities || []).forEach((ia: { id?: string; interactiveActivityType?: string }) => {
+          if (ia.id && ia.interactiveActivityType) map[ia.id] = ia.interactiveActivityType;
+        });
+        setActivityTypeMap(map);
+      } catch {
+        // Non-fatal — labels just fall back to "Interactive Activity"
+      }
+    };
+    buildMap();
   }, [token]);
 
   // Initialize selected groups from existing assignments
@@ -357,13 +395,19 @@ const ParticipantAssessorManagementStep: React.FC = () => {
   const getAvailableActivities = (): OptionType[] => {
     const formActivities = formData.activities || [];
     return formActivities.map((activity: FormActivity) => {
-      const activityTypeLabel = activity.activityType === 'case-study' ? 'Case Study' : 
-                               activity.activityType === 'inbox-activity' ? 'Inbox Activity' : 
-                               activity.activityType || 'Unknown';
+      const activityId = activity.activityContent || activity.id || '';
+      // Prefer the value already on the activity (set by SelectContentStep),
+      // fall back to the map built from case-studies / inbox-activities API.
+      const interactiveType =
+        activity.interactiveActivityType || activityTypeMap[activityId];
+      const activityTypeLabel = getActivityTypeLabel(
+        activity.activityType,
+        interactiveType
+      );
       const displayName = activity.displayName || activity.name || 'Unnamed Activity';
-      
+
       return {
-        value: activity.activityContent || activity.id || '',
+        value: activityId,
         label: `${displayName} (${activityTypeLabel})`,
       };
     });

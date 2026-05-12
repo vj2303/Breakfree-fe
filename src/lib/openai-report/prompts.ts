@@ -81,7 +81,8 @@ REQUIREMENTS:
 - Where evidence is thin, the paragraph is shorter — never padded with generic descriptors.
 - For development paragraphs, name what would have moved the score up by one band, citing the next BARS anchor where useful.
 - Each "body" paragraph must be between 60 and 200 words.
-- Each "title" must be 3-7 words.`;
+- Each "title" must be 3-7 words.
+- If "readiness_scores" are present in the input, use them to enrich the analysis. Readiness scores represent the participant's self-assessed knowledge (from a Situational Judgement Test) while the scoring block represents observed application during exercises. Where a gap exists between readiness and application for a competency, note whether the participant's theoretical knowledge outpaces their observed behaviour (knowledge ahead) or vice versa (behaviour ahead), and incorporate this into the strengths or development narrative.`;
 
 export const AI_INSIGHTS_USER_PROMPT = `Generate the AI-Powered Insights section for the assessment report.
 
@@ -94,7 +95,8 @@ REQUIREMENTS:
 - Produce 3-5 predictive indicators. Mix at least one OPPORTUNITY among the RISKs.
 - "current_fit" and "potential_fit" should be calibrated — 1-10 scale, with
   potential_fit > current_fit by a credible margin (typically 1-3 points).
-- Behavioural archetype name: 2-3 words.`;
+- Behavioural archetype name: 2-3 words.
+- If "readiness_scores" are present, factor the readiness-vs-application gap into your analysis. Competencies where readiness significantly exceeds application suggest untapped knowledge that needs practical reinforcement. Competencies where application exceeds readiness suggest intuitive strengths that could be reinforced with formal frameworks. Use these gaps to inform cross-competency patterns and predictive indicators.`;
 
 export const RECOMMENDATIONS_USER_PROMPT = `Generate the 70-20-10 Recommendations section for the assessment report.
 
@@ -107,4 +109,5 @@ REQUIREMENTS:
 - Priority is HIGH for average score <2.6, MEDIUM for 2.6-3.4, LOW for >=3.5.
 - Include 5 concrete next steps the participant should take in the first 30 days.
 - Every recommendation must be specific and actionable — no vague "improve X" statements.
-- Books and courses must be real and findable.`;
+- Books and courses must be real and findable.
+- If "readiness_scores" are present, tailor recommendations based on readiness-vs-application gaps. Where readiness exceeds application, prioritise on-the-job practice and coaching to translate knowledge into behaviour. Where application exceeds readiness, prioritise formal learning to build theoretical grounding for existing intuitive strengths.`;

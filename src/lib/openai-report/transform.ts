@@ -40,6 +40,7 @@ interface RawAssessmentData {
     activityType?: string;
     displayName?: string;
   }>;
+  readinessScores?: Record<string, number>; // { "Competency Name": score } from uploaded Excel
 }
 
 /**
@@ -176,5 +177,8 @@ export function transformToReportInput(
       target_role: data.participant?.designation || "Leadership Role",
     },
     scoring: buildScoring(data),
+    ...(data.readinessScores && Object.keys(data.readinessScores).length > 0
+      ? { readiness_scores: data.readinessScores }
+      : {}),
   };
 }

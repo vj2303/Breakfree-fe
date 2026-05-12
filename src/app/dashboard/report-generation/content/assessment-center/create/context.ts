@@ -13,6 +13,10 @@ export interface Activity {
   activityContent: string;
   displayName: string;
   displayInstructions: string;
+  // Sub-type for case-study activities: 'GD' (Group Discussion) | 'ROLEPLAY'
+  // | 'CASE_STUDY'. Persisted from SelectContentStep so downstream wizard
+  // steps can show "Group Discussion" instead of generic "Case Study".
+  interactiveActivityType?: string;
 }
 
 // Updated Assignment interface to support multiple assessors per activity

@@ -138,6 +138,10 @@ function AIReportPage() {
     setLoading(true);
     setError(null);
 
+    console.log("═══════════════════════════════════════════════════");
+    console.log("🚀 [AI Report] Generating report for:", { participantId, assessmentCenterId });
+    console.log("📡 [AI Report] Calling:", `${API_V1_BASE_URL}/reports/generate-ai-enhanced`);
+
     fetch(`${API_V1_BASE_URL}/reports/generate-ai-enhanced`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -146,9 +150,49 @@ function AIReportPage() {
       .then(async (r) => {
         const json = await r.json();
         if (!r.ok || !json.success) throw new Error(json.message || "Failed to generate");
+
+        console.log("✅ [AI Report] Response received");
+        console.log("👤 [AI Report] Participant:", json.data.participant?.name, "—", json.data.participant?.email);
+        console.log("🏢 [AI Report] Assessment Center:", json.data.assessmentCenter?.name);
+
+        // ─── READINESS SCORES DEBUG ──────────────────────────────────
+        console.log("─────────── READINESS SCORES DEBUG ───────────");
+        console.log("📊 [Readiness] data.readinessScores (top-level):", json.data.readinessScores);
+        console.log("📊 [Readiness] data.input.readiness_scores (in input):", json.data.input?.readiness_scores);
+        console.log("🔍 [Readiness] _diagnostics from backend:", json.data._diagnostics);
+
+        if (json.data._diagnostics) {
+          const d = json.data._diagnostics;
+          console.log("   • readinessRecordExists in DB:", d.readinessRecordExists);
+          console.log("   • Raw Excel keys:", d.rawExcelKeys);
+          console.log("   • DB competency names:", d.dbCompetencyNames);
+          console.log("   • Matched readiness keys (after fuzzy match):", d.matchedReadinessKeys);
+
+          if (!d.readinessRecordExists) {
+            console.warn("⚠️ [Readiness] NO readiness record found in DB for this participant + assessment center.");
+            console.warn("   → Did you upload the Excel for THIS participant email and THIS assessment center?");
+          } else if (d.matchedReadinessKeys.length === 0) {
+            console.warn("⚠️ [Readiness] Excel was uploaded but NONE of the competency names matched.");
+            console.warn("   → Excel headers:", d.rawExcelKeys);
+            console.warn("   → DB competency names:", d.dbCompetencyNames);
+            console.warn("   → Update Excel headers to match DB competency names.");
+          } else if (d.matchedReadinessKeys.length < d.dbCompetencyNames.length) {
+            console.warn("⚠️ [Readiness] Some competencies matched, some didn't.");
+            console.warn("   → Matched:", d.matchedReadinessKeys);
+            console.warn("   → Missing:", d.dbCompetencyNames.filter((n: string) => !d.matchedReadinessKeys.includes(n)));
+          } else {
+            console.log("✅ [Readiness] All competencies matched successfully!");
+          }
+        }
+        console.log("───────────────────────────────────────────────");
+        console.log("═══════════════════════════════════════════════════");
+
         setData(json.data);
       })
-      .catch((e) => setError(e.message))
+      .catch((e) => {
+        console.error("❌ [AI Report] Generation failed:", e.message);
+        setError(e.message);
+      })
       .finally(() => setLoading(false));
   }, [token, participantId, assessmentCenterId]);
 

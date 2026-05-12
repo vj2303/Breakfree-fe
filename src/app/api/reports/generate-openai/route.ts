@@ -48,8 +48,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch assessment center details (competencies, activities)
-    const [acResponse, scoresResponse, participantResponse] = await Promise.all(
+    // Fetch assessment center details, scores, participant, and readiness scores
+    const [acResponse, scoresResponse, participantResponse, readinessResponse] = await Promise.all(
       [
         fetch(
           `${SERVER_API_BASE_URL_WITH_API}/assessment-centers/${assessmentCenterId}`,
@@ -78,6 +78,15 @@ export async function POST(request: NextRequest) {
             },
           }
         ),
+        fetch(
+          `${SERVER_API_BASE_URL_WITH_API}/v1/readiness-scores/${participantId}/${assessmentCenterId}`,
+          {
+            headers: {
+              Authorization: authHeader,
+              "Content-Type": "application/json",
+            },
+          }
+        ),
       ]
     );
 
@@ -88,6 +97,9 @@ export async function POST(request: NextRequest) {
       : null;
     const participantData = participantResponse.ok
       ? await participantResponse.json()
+      : null;
+    const readinessData = readinessResponse.ok
+      ? await readinessResponse.json()
       : null;
 
     // Build the raw data structure
@@ -101,6 +113,7 @@ export async function POST(request: NextRequest) {
       scores: scoresData?.data?.scores || [],
       competencies: acData?.data?.competencies || [],
       activities: acData?.data?.activities || [],
+      readinessScores: readinessData?.data?.scores || undefined,
     };
 
     // Transform to ReportInput
@@ -129,6 +142,7 @@ export async function POST(request: NextRequest) {
         assessmentCenter: rawData.assessmentCenter,
         input: reportInput,
         report,
+        readinessScores: rawData.readinessScores || null,
       },
     });
   } catch (error) {

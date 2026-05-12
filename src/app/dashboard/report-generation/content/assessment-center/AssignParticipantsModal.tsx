@@ -5,6 +5,7 @@ import { X, Users, UserCheck, Activity, ChevronDown, CheckCircle2, AlertCircle, 
 import Select, { StylesConfig, GroupBase, MultiValue } from 'react-select';
 import { useAuth } from '@/context/AuthContext';
 import { API_BASE_URL_WITH_API } from '@/lib/apiConfig';
+import { getActivityTypeLabel } from '@/lib/activityTypeLabel';
 
 interface Participant {
   id: string;
@@ -49,6 +50,9 @@ interface Activity {
   activityContent?: string;
   displayName?: string;
   name?: string;
+  // 'GD' | 'ROLEPLAY' | 'CASE_STUDY' — passed through from page.tsx loader so
+  // the label can show the real sub-type, not just "Case Study".
+  interactiveActivityType?: string;
 }
 
 type OptionType = { value: string; label: string };
@@ -310,17 +314,17 @@ const AssignParticipantsModal: React.FC<AssignParticipantsModalProps> = ({
     }
     
     const mapped = activities.map((activity: Activity) => {
-      // Match the exact logic from ParticipantAssessorManagementStep
-      const activityTypeLabel = activity.activityType === 'case-study' ? 'Case Study' : 
-                               activity.activityType === 'inbox-activity' ? 'Inbox Activity' : 
-                               activity.activityType || 'Unknown';
+      const activityTypeLabel = getActivityTypeLabel(
+        activity.activityType,
+        activity.interactiveActivityType
+      );
       const displayName = activity.displayName || activity.name || 'Unnamed Activity';
       const value = activity.activityContent || activity.id || '';
-      
+
       if (!value) {
         console.warn('Activity missing value:', activity);
       }
-      
+
       return {
         value: value,
         label: `${displayName} (${activityTypeLabel})`,

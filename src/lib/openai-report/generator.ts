@@ -58,6 +58,7 @@ export interface ReportInput {
       }
     >
   >;
+  readiness_scores?: Record<string, number>; // { "Competency Name": readiness_score } from uploaded Excel
 }
 
 export interface GeneratedReport {
