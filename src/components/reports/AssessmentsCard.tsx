@@ -33,22 +33,17 @@ const AssessmentsCard: React.FC<AssessmentsCardProps> = ({ data }) => {
   const inProgressCount = stats.inProgress ?? 0;
   const completedCount = stats.completed ?? 0;
 
-  // Some backend responses may return an incorrect `totalAssessments` (e.g. smaller than `assigned`),
-  // which makes the UI show huge percentages like `600%`.
+  // Use totalAssessments as the denominator for percentages; fall back to the
+  // largest of the three counts if totalAssessments is somehow under-reported.
   const effectiveTotalForPercent =
     Math.max(stats.totalAssessments ?? 0, assignedCountFromApi, inProgressCount, completedCount) || 0;
 
-  // UI interpretation:
-  // "Assigned" should represent the "not started yet" bucket (so that:
-  // Assigned + In progress + Completed = Total number of assessments).
-  //
-  // Some backend responses return `assigned === totalAssessments` which makes
-  // Assigned always 100%. In that case, derive Assigned as the remaining bucket.
-  const assignedCount =
-    (assignedCountFromApi === effectiveTotalForPercent &&
-      effectiveTotalForPercent > 0)
-      ? Math.max(effectiveTotalForPercent - inProgressCount - completedCount, 0)
-      : assignedCountFromApi;
+  // Display the raw assigned count from the backend (= total activities with assessors).
+  // Each of the three bars is an independent cumulative metric relative to the total:
+  //   Assigned   = all activities that have been assigned to participants
+  //   In progress = activities where the participant has submitted a response
+  //   Completed  = activities that have been fully scored by an assessor
+  const assignedCount = assignedCountFromApi;
 
   const clampPct = (pct: number) => Math.min(Math.max(pct, 0), 100);
 
