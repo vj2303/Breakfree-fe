@@ -139,7 +139,7 @@ const TaskStep: React.FC<TaskStepProps> = ({ activityData, submissionData, setSu
                 <input
                   key={fileInputKey}
                   type="file"
-                  accept={submissionData.submissionType === 'VIDEO' ? 'video/*' : '.pdf,.doc,.docx,.txt'}
+                  accept={submissionData.submissionType === 'VIDEO' ? 'video/*' : '.pdf,.doc,.docx,.ppt,.pptx,.txt'}
                   onChange={handleFileChange}
                   className="hidden"
                   id="file-upload"
