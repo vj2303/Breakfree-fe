@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Loader2, ArrowLeft, CheckCircle, Edit } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -9,8 +9,6 @@ import {
   NUMERIC_SCORE_COMMENT_KEY,
   averageSubCompetencyScores,
   formatCompetencyAverage,
-  getCommentForScoreKey,
-  getInteractiveActivityTypeBadge,
   getSortedScoreKeysFromDescriptions,
   mergeActivitySubCompCommentsFromApi,
   mergeAssignmentSubCompCommentsFromApi,
@@ -23,7 +21,7 @@ import type {
   EvaluationResponse,
   ParticipantDetails,
 } from './lib/types';
-import ScoreLevelPicker from './components/ScoreLevelPicker';
+import CompetencyScoreCard from './components/CompetencyScoreCard';
 
 
 interface ParticipantScoringProps {
@@ -72,21 +70,14 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
   const [editMode, setEditMode] = useState(false); // Whether in edit mode
   const [editReason, setEditReason] = useState(''); // Reason for editing
 
-  const skipNextLeftActivityScrollRef = useRef(true);
+  // Scoring navigation — UI only, never persisted.
+  const [activeCompetencyId, setActiveCompetencyId] = useState<string | null>(null);
+  const [activeSubCompIndex, setActiveSubCompIndex] = useState(0);
+  const [competencyCardCollapsed, setCompetencyCardCollapsed] = useState(false);
 
   useEffect(() => {
-    skipNextLeftActivityScrollRef.current = true;
-  }, [selectedAssignmentId]);
-
-  useEffect(() => {
-    if (!selectedActivityId) return;
-    const el = document.getElementById(`score-activity-${selectedActivityId}`);
-    if (!el) return;
-    if (skipNextLeftActivityScrollRef.current) {
-      skipNextLeftActivityScrollRef.current = false;
-      return;
-    }
-    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    setActiveCompetencyId(null);
+    setActiveSubCompIndex(0);
   }, [selectedActivityId]);
 
   // Get assessmentCenterId and edit mode from URL query params
@@ -1062,6 +1053,53 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
           
           if (!selectedAssignment) return null;
 
+          const selectedActivity = selectedActivityId
+            ? selectedAssignment.activities.find((a) => a.activityId === selectedActivityId)
+            : undefined;
+
+          // Some activities carry more than one competency.
+          const activityCompetencies = selectedActivity
+            ? getCompetenciesForActivity(
+                selectedActivity.activityId,
+                selectedActivity.competency,
+                selectedAssignment.competencies
+              )
+            : [];
+          const activeCompetencyIndex = Math.max(
+            0,
+            activityCompetencies.findIndex((c) => c.id === activeCompetencyId)
+          );
+          const activeCompetency = activityCompetencies[activeCompetencyIndex] ?? null;
+
+          const isScoringDisabled =
+            (scoreStatus[selectedAssignmentId] === 'SUBMITTED' ||
+              scoreStatus[selectedAssignmentId] === 'FINALIZED') &&
+            !editMode;
+
+          // Next walks sub-competencies, then rolls into the next competency.
+          const advanceSubCompetency = () => {
+            if (!activeCompetency) return;
+            const lastSub = activeCompetency.subCompetencyNames.length - 1;
+            if (activeSubCompIndex < lastSub) {
+              setActiveSubCompIndex(activeSubCompIndex + 1);
+              return;
+            }
+            const nextCompetency = activityCompetencies[activeCompetencyIndex + 1];
+            if (nextCompetency) {
+              setActiveCompetencyId(nextCompetency.id);
+              setActiveSubCompIndex(0);
+            }
+          };
+          const isFinalSubCompetency =
+            !!activeCompetency &&
+            activeCompetencyIndex === activityCompetencies.length - 1 &&
+            activeSubCompIndex === activeCompetency.subCompetencyNames.length - 1;
+          const nextSubCompetencyLabel =
+            activeCompetency &&
+            activeSubCompIndex < activeCompetency.subCompetencyNames.length - 1
+              ? 'Next Sub-Competency'
+              : 'Next Competency';
+
           // Use stored competencyAverages if available, otherwise calculate on the fly
           const competencyAveragesList: Array<{ id: string; name: string; average: number | null }> = [];
           console.log('Displaying competency averages for assignment:', selectedAssignmentId);
@@ -1136,196 +1174,47 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
                   <p className="text-xs text-gray-600 mt-0.5">{selectedAssignment.assessmentCenter.description}</p>
                 </div>
                 
-                {/* Activity-based Competency Scoring */}
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium text-black mb-2">Score by Activity</h4>
-                  {selectedAssignment.activities
-                    .sort((a, b) => a.displayOrder - b.displayOrder)
-                    .map((activity) => {
-                      // Some activities can have multiple competencies (e.g. both C5 and C1).
-                      const assignedCompetencies = getCompetenciesForActivity(
-                        activity.activityId,
-                        activity.competency,
-                        selectedAssignment.competencies
-                      );
-                      const firstCompetency = assignedCompetencies[0];
-                      const activityCompAvg =
-                        firstCompetency &&
-                        averageSubCompetencyScores(
-                          firstCompetency.subCompetencyNames,
-                          activityCompetencyScores[activity.activityId]?.[firstCompetency.id]
-                        );
-                      const isActivitySelected = selectedActivityId === activity.activityId;
-
-                      return (
-                      <div
-                        key={activity.activityId}
-                        id={`score-activity-${activity.activityId}`}
-                        className={`mb-3 rounded p-2.5 transition-colors ${
-                          isActivitySelected
-                            ? 'border border-gray-300 bg-gray-50/90 shadow-sm'
-                            : 'border border-gray-200 bg-gray-50'
-                        }`}
-                      >
-                        <div
-                          className="mb-1.5 flex cursor-pointer items-center justify-between rounded-sm outline-none hover:bg-black/5"
-                          onClick={() => setSelectedActivityId(activity.activityId)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              setSelectedActivityId(activity.activityId);
-                            }
-                          }}
-                          role="button"
-                          tabIndex={0}
-                          aria-pressed={isActivitySelected}
-                          aria-label={`Select activity ${activity.displayName || activity.activityDetail.name}`}
-                        >
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <p className="font-medium text-sm text-black">{activity.displayName || activity.activityDetail.name}</p>
-                              {(() => {
-                                const badge = getInteractiveActivityTypeBadge(activity.activityDetail.interactiveActivityType);
-                                return badge ? (
-                                  <span className={`px-1.5 py-0.5 text-xs font-medium rounded border ${badge.color}`}>
-                                    {badge.label}
-                                  </span>
-                                ) : null;
-                              })()}
-                            </div>
-                            <p className="text-xs text-gray-600">
-                              {assignedCompetencies.length > 0 ? (
-                                <span className="font-medium text-black">
-                                  {assignedCompetencies.map((c) => {
-                                    const compAvg = averageSubCompetencyScores(
-                                      c.subCompetencyNames,
-                                      activityCompetencyScores[activity.activityId]?.[c.id]
-                                    );
-                                    return (
-                                      <span key={c.id}>
-                                        {c.competencyName.split('\t')[0]}
-                                        {compAvg !== null && (
-                                          <span className="ml-1.5 tabular-nums text-gray-800">
-                                            ({formatCompetencyAverage(compAvg)})
-                                          </span>
-                                        )}
-                                      </span>
-                                    );
-                                  }).reduce((prev, curr) => (
-                                    <>
-                                      {prev}
-                                      <span className="mx-1 text-gray-400">·</span>
-                                      {curr}
-                                    </>
-                                  ))}
-                                </span>
-                              ) : (
-                                <span className="font-medium text-black">No Competency</span>
-                              )}
-                            </p>
-                          </div>
-                          <span className={`text-xs px-1.5 py-0.5 rounded border ${
-                            Boolean(activity.submission) ? 'bg-green-50 text-green-700 border-green-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                          }`}>
-                            {Boolean(activity.submission) ? 'Submitted' : 'Pending'}
-                          </span>
-                        </div>
-                            {assignedCompetencies.length > 0 && (
-                          <div className="mt-2 space-y-3">
-                            {assignedCompetencies.map((assignedCompetency) => (
-                              <div key={assignedCompetency.id} className="space-y-1.5">
-                                <p className="text-xs font-semibold text-black">
-                                  {assignedCompetency.competencyName.split('\t')[0] || assignedCompetency.competencyName}
-                                </p>
-                                <div className="mt-2 space-y-1.5">
-                            {assignedCompetency.subCompetencyNames.map((subComp, idx) => {
-                              // subCompetencyName strings may include "\t<description>".
-                              // For the UI summary we show only the title portion.
-                              const subCompTitle = subComp.split('\t')[0] || subComp;
-                              const scoreDescriptions = getScoreDescriptions(activity.activityId, assignedCompetency.id, subComp);
-                              const scoreKeys = getSortedScoreKeysFromDescriptions(scoreDescriptions);
-                              const currentScore = activityCompetencyScores[activity.activityId]?.[assignedCompetency.id]?.[subComp] ?? 0;
-                              const selectedScoreKey = activitySelectedScoreKeys[activity.activityId]?.[assignedCompetency.id]?.[subComp];
-                              // Disable editing if score is submitted/finalized and not in edit mode
-                              const isScoreSubmitted = scoreStatus[selectedAssignmentId] === 'SUBMITTED' || scoreStatus[selectedAssignmentId] === 'FINALIZED';
-                              const isDisabled = isScoreSubmitted && !editMode;
-
-                              const effectiveNoteKey = selectedScoreKey ?? NUMERIC_SCORE_COMMENT_KEY;
-                              const noteValue = getCommentForScoreKey(
-                                activitySubCompComments[activity.activityId]?.[assignedCompetency.id]?.[subComp],
-                                effectiveNoteKey,
-                                { isFirstScoreKey: effectiveNoteKey === scoreKeys[0] }
-                              );
-
-                              return (
-                                <details key={idx} open={idx === 0} className="group">
-                                  <summary className="cursor-pointer select-none text-xs font-medium text-black hover:text-gray-900">
-                                    {subCompTitle}
-                                  </summary>
-                                  <div className="mt-2 space-y-3 rounded-lg border border-gray-200 bg-white p-3">
-                                    <ScoreLevelPicker
-                                      scoreDescriptions={scoreDescriptions}
-                                      currentScore={currentScore}
-                                      selectedScoreKey={selectedScoreKey}
-                                      disabled={isDisabled}
-                                      onSelectLevel={(level, scoreKey) =>
-                                        handleSelectLevel(
-                                          activity.activityId,
-                                          assignedCompetency.id,
-                                          subComp,
-                                          level,
-                                          scoreKey
-                                        )
-                                      }
-                                      onNumericChange={(score) =>
-                                        handleNumericChange(
-                                          activity.activityId,
-                                          assignedCompetency.id,
-                                          subComp,
-                                          score
-                                        )
-                                      }
-                                    />
-                                    <div className="border-t border-gray-200 pt-3">
-                                      <label className="block text-xs font-semibold text-black">
-                                        Evidence / Behavioural Notes
-                                      </label>
-                                      <p className="mb-1.5 text-xs text-gray-500">
-                                        Provide specific examples from the video to support the score.
-                                      </p>
-                                      <textarea
-                                        rows={4}
-                                        maxLength={1000}
-                                        value={noteValue}
-                                        disabled={isDisabled}
-                                        onChange={(e) =>
-                                          handleNoteChange(
-                                            activity.activityId,
-                                            assignedCompetency.id,
-                                            subComp,
-                                            e.target.value
-                                          )
-                                        }
-                                        className="w-full rounded-lg border border-gray-300 p-2.5 text-xs text-black focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
-                                        placeholder={`Notes for ${subCompTitle}…`}
-                                      />
-                                      <p className="mt-1 text-right text-[11px] text-gray-400">
-                                        Characters: {noteValue.length}/1000
-                                      </p>
-                                    </div>
-                                  </div>
-                                </details>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                      </div>
-                    )}
-                      </div>
-                    );
-                    })}
-                </div>
+                {/* Single-competency scoring, driven by the activity and competency rails */}
+                {activeCompetency ? (
+                  <CompetencyScoreCard
+                    competency={activeCompetency}
+                    competencyIndex={activeCompetencyIndex}
+                    competencyCount={activityCompetencies.length}
+                    activeSubCompIndex={activeSubCompIndex}
+                    onActiveSubCompChange={setActiveSubCompIndex}
+                    scoreDescriptionsFor={(sub) =>
+                      getScoreDescriptions(selectedActivity!.activityId, activeCompetency.id, sub)
+                    }
+                    scores={activityCompetencyScores[selectedActivity!.activityId]?.[activeCompetency.id]}
+                    selectedKeys={activitySelectedScoreKeys[selectedActivity!.activityId]?.[activeCompetency.id]}
+                    notes={activitySubCompComments[selectedActivity!.activityId]?.[activeCompetency.id]}
+                    disabled={isScoringDisabled}
+                    collapsed={competencyCardCollapsed}
+                    onToggleCollapsed={() => setCompetencyCardCollapsed((prev) => !prev)}
+                    onSelectLevel={(sub, level, scoreKey) =>
+                      handleSelectLevel(
+                        selectedActivity!.activityId,
+                        activeCompetency.id,
+                        sub,
+                        level,
+                        scoreKey
+                      )
+                    }
+                    onNumericChange={(sub, score) =>
+                      handleNumericChange(selectedActivity!.activityId, activeCompetency.id, sub, score)
+                    }
+                    onNoteChange={(sub, value) =>
+                      handleNoteChange(selectedActivity!.activityId, activeCompetency.id, sub, value)
+                    }
+                    onNext={advanceSubCompetency}
+                    nextLabel={nextSubCompetencyLabel}
+                    nextDisabled={isFinalSubCompetency}
+                  />
+                ) : (
+                  <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+                    No competencies are configured for this activity.
+                  </div>
+                )}
 
                 <div className="border-t border-gray-200 pt-3">
                   {selectedAssignmentId && (scoreStatus[selectedAssignmentId] === 'SUBMITTED' || scoreStatus[selectedAssignmentId] === 'FINALIZED') ? (
