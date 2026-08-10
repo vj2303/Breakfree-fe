@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { downloadParticipantReportPdf } from '@/lib/reports/participantReportPdf';
 
 import {
   NUMERIC_SCORE_COMMENT_KEY,
@@ -778,22 +779,38 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
         throw new Error(errorData.message || `Failed to generate report: ${reportResponse.status}`);
       }
 
-      const reportBlob = await reportResponse.blob();
-      
-      // Create a download link and trigger download
-      const downloadUrl = window.URL.createObjectURL(reportBlob);
-      const downloadLink = document.createElement('a');
-      downloadLink.href = downloadUrl;
-      const reportFileName = `${assignment.assessmentCenter.displayName || assignment.assessmentCenter.name}_${participantDetails.data.participant.name}_Report.pdf`.replace(/[^a-z0-9]/gi, '_');
-      downloadLink.download = reportFileName;
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
-      
-      // Clean up the object URL
-      window.URL.revokeObjectURL(downloadUrl);
+      // This endpoint returns report *content* as JSON, not a PDF binary — the previous
+      // `.blob()` wrote the raw API envelope to disk. Render it with the same builder the
+      // admin download uses so both produce an identical document.
+      const reportResult = await reportResponse.json();
+
+      if (!reportResult.success || !reportResult.data) {
+        throw new Error(reportResult.message || 'Failed to generate report');
+      }
+
+      const centerName =
+        reportResult.data.assessmentCenter?.name ||
+        reportResult.data.assessmentCenter?.displayName ||
+        assignment.assessmentCenter.displayName ||
+        assignment.assessmentCenter.name ||
+        '';
+
+      downloadParticipantReportPdf({
+        reportContent: reportResult.data.reportContent,
+        participantName:
+          reportResult.data.participant?.name || participantDetails.data.participant.name,
+        participantEmail:
+          reportResult.data.participant?.email || participantDetails.data.participant.email,
+        assessmentCenterName: centerName || 'N/A',
+        assessmentCenterFileNamePart: centerName,
+        reportName:
+          reportResult.data.reportStructure?.reportName ||
+          assignment.assessmentCenter.reportTemplateName ||
+          'Report',
+      });
+
       console.log('PDF report downloaded successfully');
-      
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred while generating the report');
       console.error('Error generating report:', err);
