@@ -9,6 +9,8 @@ import {
   NUMERIC_SCORE_COMMENT_KEY,
   averageSubCompetencyScores,
   formatCompetencyAverage,
+  deriveProgressStatus,
+  getActivityProgress,
   getSortedScoreKeysFromDescriptions,
   mergeActivitySubCompCommentsFromApi,
   mergeAssignmentSubCompCommentsFromApi,
@@ -21,9 +23,13 @@ import type {
   ParticipantDetails,
   SubmissionRecord,
 } from './lib/types';
+import type { ActivityRailItem } from './lib/types';
+import ActivityRail from './components/ActivityRail';
 import CompetencyRail from './components/CompetencyRail';
+import EvaluationResults from './components/EvaluationResults';
 import EvidencePanel from './components/EvidencePanel';
 import CompetencyScoreCard from './components/CompetencyScoreCard';
+import ParticipantOverview from './components/ParticipantOverview';
 
 
 interface ParticipantScoringProps {
@@ -906,112 +912,9 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
     );
   }
 
-  const ParticipantCard = () => (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4 flex flex-col justify-between">
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-black">
-            {participantDetails.data.participant.name}
-          </h2>
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-1.5 text-gray-600 hover:text-black text-sm"
-          >
-            <ArrowLeft size={16} />
-            Back
-          </button>
-        </div>
-        <p className="text-xs text-gray-600 mb-0.5">Email: {participantDetails.data.participant.email}</p>
-        <p className="text-xs text-gray-600 mb-0.5">
-          {participantDetails.data.participant.designation} • Manager: {participantDetails.data.participant.managerName}
-        </p>
-        {selectedAssignmentId && (() => {
-          const selectedAssignment = participantDetails.data.assignments.find(a => a.assignmentId === selectedAssignmentId);
-          if (!selectedAssignment) return null;
-          return (
-          <p className="text-xs text-gray-600 mt-1">
-              Assessment: {selectedAssignment.assessmentCenter.displayName} • 
-              Activities: {selectedAssignment.activities.map(a => a.displayName || a.activityDetail.name).join(', ')}
-          </p>
-          );
-        })()}
-      </div>
-      <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-200">
-        <div className="flex gap-2">
-          <button 
-            onClick={generateReport}
-            disabled={isGenerating || isEvaluating}
-            className="bg-black hover:bg-gray-800 disabled:bg-gray-400 text-white px-3 py-1.5 rounded text-xs flex items-center gap-1.5"
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              'Generate report'
-            )}
-          </button>
-          <button 
-            onClick={evaluateInterview}
-            disabled={isGenerating || isEvaluating}
-            className="bg-gray-700 hover:bg-gray-800 disabled:bg-gray-400 text-white px-3 py-1.5 rounded text-xs flex items-center gap-1.5"
-          >
-            {isEvaluating ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Evaluating...
-              </>
-            ) : (
-              'Evaluate'
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  const EvaluationResults = () => {
-    if (!evaluationData) return null;
-
-    return (
-      <div className="mt-4 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-base font-semibold text-black">Interview Evaluation Report</h3>
-          <div className="text-right">
-            <p className="text-sm font-bold text-black">Overall Score: {evaluationData.overall_score}</p>
-            <p className="text-xs text-gray-600">Average: {evaluationData.summary.average_score}</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {evaluationData.evaluations.map((evaluation, index) => (
-            <div key={index} className="border border-gray-200 rounded p-3">
-              <div className="flex justify-between items-center mb-1.5">
-                <h4 className="font-medium text-sm text-black">{evaluation.metric}</h4>
-                <span className="text-xs font-semibold px-2 py-0.5 bg-gray-100 rounded text-black border border-gray-200">
-                  {evaluation.score}
-                </span>
-              </div>
-              <p className="text-xs text-gray-700">{evaluation.reasoning}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-3 text-xs text-gray-600 pt-3 border-t border-gray-200">
-          <p>Report generated for: {evaluationData.filename}</p>
-          <p>Total metrics evaluated: {evaluationData.summary.total_metrics}</p>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-7xl mx-auto">
-        {/* Title & Participant */}
-        <ParticipantCard />
-
         {/* Error Display */}
         {error && (
           <div className="mt-3 bg-red-50 border border-red-200 rounded p-3">
@@ -1074,6 +977,32 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
             activityCompetencies.findIndex((c) => c.id === activeCompetencyId)
           );
           const activeCompetency = activityCompetencies[activeCompetencyIndex] ?? null;
+
+          // Sorted copy — the state array must not be mutated during render.
+          const activityItems: ActivityRailItem[] = [...selectedAssignment.activities]
+            .sort((a, b) => a.displayOrder - b.displayOrder)
+            .map((activity) => {
+              const competencies = getCompetenciesForActivity(
+                activity.activityId,
+                activity.competency,
+                selectedAssignment.competencies
+              );
+              const { scored, total } = getActivityProgress(
+                competencies,
+                activitySelectedScoreKeys[activity.activityId],
+                activityCompetencyScores[activity.activityId]
+              );
+              return {
+                activityId: activity.activityId,
+                title: activity.displayName || activity.activityDetail.name,
+                subtitle: activity.activityDetail.name,
+                activityType: activity.activityType,
+                interactiveActivityType: activity.activityDetail.interactiveActivityType,
+                scoredCompetencies: scored,
+                totalCompetencies: total,
+                status: deriveProgressStatus(scored, total),
+              };
+            });
 
           const selectedActivityWithSubs = selectedActivity as ActivityWithSubmissions | undefined;
           // Fall back to the single `submission` when the API omitted `allSubmissions`, so an
@@ -1180,6 +1109,31 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
                   </div>
                 )}
         <div className="flex min-h-0 flex-col gap-4 xl:flex-row xl:items-stretch xl:gap-4 xl:h-[min(1200px,calc(100vh-9rem))]">
+          {/* Activities + participant */}
+          <div className="scrollbar-thin flex min-h-0 w-full flex-col gap-4 overflow-y-auto xl:w-72 xl:flex-shrink-0">
+            <ActivityRail
+              items={activityItems}
+              selectedActivityId={selectedActivityId}
+              onSelectActivity={setSelectedActivityId}
+            />
+            <div className="order-last">
+              <ParticipantOverview
+                name={participantDetails.data.participant.name}
+                participantId={participantDetails.data.participant.id}
+                program={
+                  selectedAssignment.assessmentCenter.displayName ||
+                  selectedAssignment.assessmentCenter.name
+                }
+                totalCompetencies={selectedAssignment.competencies.length}
+                activityCount={selectedAssignment.activities.length}
+                isGenerating={isGenerating}
+                isEvaluating={isEvaluating}
+                onGenerateReport={generateReport}
+                onEvaluate={evaluateInterview}
+              />
+            </div>
+          </div>
+
           {/* Competency Section */}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -1330,7 +1284,7 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
         })()}
 
         {/* Evaluation Results */}
-        <EvaluationResults />
+        <EvaluationResults data={evaluationData} />
       </div>
     </div>
   );
