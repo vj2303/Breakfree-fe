@@ -15,7 +15,6 @@ import {
   mergeActivitySubCompCommentsFromApi,
   mergeAssignmentSubCompCommentsFromApi,
   normalizeStoredToLevel,
-  parseScoreKeyLevel,
 } from './lib/rubric';
 import { DocumentSubmissionPreview } from './lib/submissionPreview';
 import type {
@@ -24,102 +23,8 @@ import type {
   EvaluationResponse,
   ParticipantDetails,
 } from './lib/types';
+import ScoreLevelPicker from './components/ScoreLevelPicker';
 
-
-function RubricScorePicker({
-  scoreDescriptions,
-  currentScore,
-  onSelectLevel,
-  subCompLabel,
-  scoreCommentsByKey,
-  onScoreCommentChange,
-  selectedScoreKey,
-  disabled,
-}: {
-  scoreDescriptions: Record<string, string>;
-  currentScore: number;
-  onSelectLevel: (level: number, scoreKey: string) => void;
-  subCompLabel: string;
-  /** Comments keyed by descriptor keys: score1, score2, … (same keys as rubric) */
-  scoreCommentsByKey: Record<string, string>;
-  onScoreCommentChange?: (scoreKey: string, value: string) => void;
-  selectedScoreKey?: string; // The stored tick mark (e.g., "score1", "score2")
-  disabled?: boolean; // Disable editing
-}) {
-  const scoreKeys = getSortedScoreKeysFromDescriptions(scoreDescriptions);
-  const numLevels = scoreKeys.length;
-  if (numLevels === 0) return null;
-  // Use the selectedScoreKey if available, otherwise calculate from numeric score
-  const highlightKey = selectedScoreKey && scoreKeys.includes(selectedScoreKey)
-    ? selectedScoreKey
-    : (() => {
-        const level = normalizeStoredToLevel(currentScore, numLevels);
-        return level >= 1 ? scoreKeys[level - 1] : undefined;
-      })();
-  // Calculate selectedLevel for display
-  const selectedLevel = highlightKey ? scoreKeys.indexOf(highlightKey) + 1 : normalizeStoredToLevel(currentScore, numLevels);
-
-  return (
-    <div className="bg-white p-2 rounded border border-gray-200">
-      <div className="flex items-center justify-between mb-1">
-        <label className="text-xs font-medium text-black">{subCompLabel}</label>
-        <div className="flex items-center gap-1.5 text-xs text-gray-700">
-          <span className="font-medium text-black tabular-nums">
-            {selectedLevel === 0 ? '—' : selectedLevel}
-          </span>
-          <span className="text-gray-500">/ {numLevels}</span>
-        </div>
-      </div>
-      <div className="mt-1.5 space-y-2">
-        <p className="text-xs font-medium text-gray-900 mb-1">Select score (click a level). Add a comment per level below.</p>
-        {scoreKeys.map((key) => {
-          const level = parseScoreKeyLevel(key);
-          const isSelected = highlightKey === key;
-          const scoreNum = key.replace('score', '');
-          return (
-            <div
-              key={key}
-              className={`rounded border text-xs transition-colors ${
-                isSelected
-                  ? 'border-blue-300 bg-blue-50/50 ring-1 ring-blue-200'
-                  : 'border-gray-200 bg-gray-50'
-              }`}
-            >
-              <button
-                type="button"
-                onClick={() => onSelectLevel(level, key)}
-                disabled={disabled}
-                className={`w-full p-1.5 text-left hover:bg-white/50 ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-              >
-                <p className="text-gray-700">
-                  <span className="font-medium text-gray-900">Score {scoreNum}: </span>
-                  {scoreDescriptions[key] || 'No description'}
-                </p>
-              </button>
-              {onScoreCommentChange !== undefined && (
-                <div className="border-t border-gray-200/80 bg-white px-1.5 pb-1.5 pt-1">
-                  <label className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-gray-500">
-                    Comment for Score {scoreNum}
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={getCommentForScoreKey(scoreCommentsByKey, key, {
-                      isFirstScoreKey: key === scoreKeys[0],
-                    })}
-                    onChange={(e) => onScoreCommentChange(key, e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-full rounded border border-gray-300 p-1.5 text-xs text-black focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
-                    placeholder={`Notes for ${subCompLabel} — Score ${scoreNum}…`}
-                  />
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 interface ParticipantScoringProps {
   params: Promise<{ id: string; participantId: string }>;
@@ -693,6 +598,46 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
         }
       }
     }));
+  };
+
+  const handleSelectLevel = (
+    activityId: string,
+    competencyId: string,
+    subComp: string,
+    level: number,
+    scoreKey: string
+  ) => {
+    // Carry a note typed before any level was picked over to the level now chosen,
+    // but never overwrite a note that level already has.
+    const existing = activitySubCompComments[activityId]?.[competencyId]?.[subComp];
+    const pending = existing?.[NUMERIC_SCORE_COMMENT_KEY];
+    if (pending && !existing?.[scoreKey]) {
+      setActivitySubCompComment(activityId, competencyId, subComp, scoreKey, pending);
+    }
+    updateActivityCompetencyScore(activityId, competencyId, subComp, level, scoreKey);
+  };
+
+  const handleNumericChange = (
+    activityId: string,
+    competencyId: string,
+    subComp: string,
+    score: number
+  ) => {
+    updateActivityCompetencyScore(activityId, competencyId, subComp, score);
+  };
+
+  /** Notes key off the selected level; with nothing selected yet they land on the
+   *  numeric key and get carried over by handleSelectLevel. */
+  const handleNoteChange = (
+    activityId: string,
+    competencyId: string,
+    subComp: string,
+    value: string
+  ) => {
+    const scoreKey =
+      activitySelectedScoreKeys[activityId]?.[competencyId]?.[subComp] ??
+      NUMERIC_SCORE_COMMENT_KEY;
+    setActivitySubCompComment(activityId, competencyId, subComp, scoreKey, value);
   };
 
   const submitScores = async (assignmentId: string, status: 'DRAFT' | 'SUBMITTED') => {
@@ -1305,95 +1250,68 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
                               const isScoreSubmitted = scoreStatus[selectedAssignmentId] === 'SUBMITTED' || scoreStatus[selectedAssignmentId] === 'FINALIZED';
                               const isDisabled = isScoreSubmitted && !editMode;
 
-                              if (scoreKeys.length > 0) {
-                                return (
-                                  <details key={idx} open={idx === 0} className="group">
-                                    <summary className="cursor-pointer select-none text-xs font-medium text-black hover:text-gray-900">
-                                      {subCompTitle}
-                                    </summary>
-                                    <div className="mt-2">
-                                      <RubricScorePicker
-                                        scoreDescriptions={scoreDescriptions}
-                                        currentScore={currentScore}
-                                        subCompLabel={subCompTitle}
-                                        selectedScoreKey={selectedScoreKey}
-                                        disabled={isDisabled}
-                                        onSelectLevel={(level, scoreKey) =>
-                                          updateActivityCompetencyScore(
-                                            activity.activityId,
-                                            assignedCompetency.id,
-                                            subComp,
-                                            level,
-                                            scoreKey
-                                          )
-                                        }
-                                        scoreCommentsByKey={
-                                          activitySubCompComments[activity.activityId]?.[assignedCompetency.id]?.[subComp] ??
-                                          {}
-                                        }
-                                        onScoreCommentChange={(scoreKey, text) =>
-                                          setActivitySubCompComment(
-                                            activity.activityId,
-                                            assignedCompetency.id,
-                                            subComp,
-                                            scoreKey,
-                                            text
-                                          )
-                                        }
-                                      />
-                                    </div>
-                                  </details>
-                                );
-                              }
+                              const effectiveNoteKey = selectedScoreKey ?? NUMERIC_SCORE_COMMENT_KEY;
+                              const noteValue = getCommentForScoreKey(
+                                activitySubCompComments[activity.activityId]?.[assignedCompetency.id]?.[subComp],
+                                effectiveNoteKey,
+                                { isFirstScoreKey: effectiveNoteKey === scoreKeys[0] }
+                              );
 
                               return (
                                 <details key={idx} open={idx === 0} className="group">
                                   <summary className="cursor-pointer select-none text-xs font-medium text-black hover:text-gray-900">
                                     {subCompTitle}
                                   </summary>
-                                  <div className="mt-2 bg-white p-2 rounded border border-gray-200">
-                                    <div className="flex items-center justify-between mb-1">
-                                      <label className="text-xs font-medium text-black">{subCompTitle}</label>
-                                      <div className="flex items-center gap-1.5">
-                                        <input
-                                          type="number"
-                                          min="0"
-                                          max="10"
-                                          step="0.5"
-                                          value={currentScore || 0}
-                                          onChange={(e) => updateActivityCompetencyScore(
-                                            activity.activityId,
-                                            assignedCompetency.id,
-                                            subComp,
-                                            parseFloat(e.target.value) || 0
-                                          )}
-                                          className="w-16 px-2 py-1 border border-gray-300 rounded text-xs text-black focus:outline-none focus:ring-1 focus:ring-black focus:border-black"
-                                        />
-                                        <span className="text-xs text-gray-600">/10</span>
-                                      </div>
-                                    </div>
-                                    <div className="mt-2 border-t border-gray-200 pt-2">
-                                      <label className="mb-1 block text-xs font-medium text-gray-700">
-                                        Comment for “{subCompTitle}” <span className="font-normal text-gray-500">(numeric score)</span>
+                                  <div className="mt-2 space-y-3 rounded-lg border border-gray-200 bg-white p-3">
+                                    <ScoreLevelPicker
+                                      scoreDescriptions={scoreDescriptions}
+                                      currentScore={currentScore}
+                                      selectedScoreKey={selectedScoreKey}
+                                      disabled={isDisabled}
+                                      onSelectLevel={(level, scoreKey) =>
+                                        handleSelectLevel(
+                                          activity.activityId,
+                                          assignedCompetency.id,
+                                          subComp,
+                                          level,
+                                          scoreKey
+                                        )
+                                      }
+                                      onNumericChange={(score) =>
+                                        handleNumericChange(
+                                          activity.activityId,
+                                          assignedCompetency.id,
+                                          subComp,
+                                          score
+                                        )
+                                      }
+                                    />
+                                    <div className="border-t border-gray-200 pt-3">
+                                      <label className="block text-xs font-semibold text-black">
+                                        Evidence / Behavioural Notes
                                       </label>
+                                      <p className="mb-1.5 text-xs text-gray-500">
+                                        Provide specific examples from the video to support the score.
+                                      </p>
                                       <textarea
-                                        rows={2}
-                                        value={getCommentForScoreKey(
-                                          activitySubCompComments[activity.activityId]?.[assignedCompetency.id]?.[subComp],
-                                          NUMERIC_SCORE_COMMENT_KEY
-                                        )}
+                                        rows={4}
+                                        maxLength={1000}
+                                        value={noteValue}
+                                        disabled={isDisabled}
                                         onChange={(e) =>
-                                          setActivitySubCompComment(
+                                          handleNoteChange(
                                             activity.activityId,
                                             assignedCompetency.id,
                                             subComp,
-                                            NUMERIC_SCORE_COMMENT_KEY,
                                             e.target.value
                                           )
                                         }
-                                        className="w-full rounded border border-gray-300 p-2 text-xs text-black focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
-                                        placeholder={`Comment for this 0–10 score (“${subCompTitle}”)…`}
+                                        className="w-full rounded-lg border border-gray-300 p-2.5 text-xs text-black focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
+                                        placeholder={`Notes for ${subCompTitle}…`}
                                       />
+                                      <p className="mt-1 text-right text-[11px] text-gray-400">
+                                        Characters: {noteValue.length}/1000
+                                      </p>
                                     </div>
                                   </div>
                                 </details>
