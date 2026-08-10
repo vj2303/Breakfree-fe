@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, ArrowLeft, CheckCircle, Edit } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
@@ -30,6 +30,8 @@ import EvaluationResults from './components/EvaluationResults';
 import EvidencePanel from './components/EvidencePanel';
 import CompetencyScoreCard from './components/CompetencyScoreCard';
 import ParticipantOverview from './components/ParticipantOverview';
+import ScoringFooterBar from './components/ScoringFooterBar';
+import ScoringTopBar from './components/ScoringTopBar';
 
 
 interface ParticipantScoringProps {
@@ -83,6 +85,7 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
   const [activeSubCompIndex, setActiveSubCompIndex] = useState(0);
   const [competencyCardCollapsed, setCompetencyCardCollapsed] = useState(false);
   const [activeSubmissionId, setActiveSubmissionId] = useState<string | null>(null);
+  const [footerCollapsed, setFooterCollapsed] = useState(false);
 
   useEffect(() => {
     setActiveCompetencyId(null);
@@ -915,13 +918,6 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-7xl mx-auto">
-        {/* Error Display */}
-        {error && (
-          <div className="mt-3 bg-red-50 border border-red-200 rounded p-3">
-            <p className="text-red-800 text-xs">{error}</p>
-          </div>
-        )}
-
         {/* Only show assignment selector if assessmentCenterId not provided and multiple assignments exist */}
         {!assessmentCenterId && participantDetails.data.assignments.length > 1 && (
           <div className="mt-4 bg-white rounded-lg shadow-sm border border-gray-200 p-3">
@@ -1015,6 +1011,13 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
                 ? [selectedActivity.submission as SubmissionRecord]
                 : [];
 
+          const assignmentProgress = getActivityProgress(
+            activityCompetencies,
+            selectedActivity ? activitySelectedScoreKeys[selectedActivity.activityId] : undefined,
+            selectedActivity ? activityCompetencyScores[selectedActivity.activityId] : undefined
+          );
+          const lifecycleStatus = scoreStatus[selectedAssignmentId] ?? 'DRAFT';
+
           const isScoringDisabled =
             (scoreStatus[selectedAssignmentId] === 'SUBMITTED' ||
               scoreStatus[selectedAssignmentId] === 'FINALIZED') &&
@@ -1092,7 +1095,39 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
           console.log('Final competencyAveragesList for display:', competencyAveragesList);
 
           return (
-        <div className="mt-4 flex flex-col gap-3">
+        <div className="flex min-h-0 flex-1 flex-col">
+                <ScoringTopBar
+                  participantName={participantDetails.data.participant.name}
+                  participantId={participantDetails.data.participant.id}
+                  activityTitle={
+                    selectedActivity
+                      ? selectedActivity.displayName || selectedActivity.activityDetail.name
+                      : ''
+                  }
+                  activitySubtitle={selectedActivity?.activityDetail.description ?? ''}
+                  lifecycleStatus={lifecycleStatus}
+                  progressStatus={deriveProgressStatus(
+                    assignmentProgress.scored,
+                    assignmentProgress.total
+                  )}
+                  scoredCompetencies={assignmentProgress.scored}
+                  totalCompetencies={assignmentProgress.total}
+                  readOnly={isScoringDisabled}
+                  editMode={editMode}
+                  editReason={editReason}
+                  onEditReasonChange={setEditReason}
+                  isSubmitting={isSubmittingScore}
+                  onBack={() => router.back()}
+                  onSubmit={() => submitScores(selectedAssignmentId, 'SUBMITTED')}
+                />
+
+                {error && (
+                  <div className="border-b border-red-200 bg-red-50 px-4 py-2.5">
+                    <p className="text-xs text-red-800">{error}</p>
+                  </div>
+                )}
+
+                <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
                 {competencyAveragesList.length > 0 && competencyAveragesList.some(c => c.average !== null) && (
                   <div className="rounded-lg border border-gray-200 bg-gray-100 px-4 py-3">
                     <h4 className="text-sm font-medium text-gray-800 mb-2">Competency Averages</h4>
@@ -1198,60 +1233,6 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
                   </div>
                 )}
 
-                <div className="border-t border-gray-200 pt-3">
-                  {selectedAssignmentId && (scoreStatus[selectedAssignmentId] === 'SUBMITTED' || scoreStatus[selectedAssignmentId] === 'FINALIZED') ? (
-                    editMode ? (
-                      <div className="space-y-2">
-                        <div className="w-full bg-yellow-50 border border-yellow-200 text-yellow-700 px-3 py-2 rounded text-xs flex items-center justify-center gap-1.5 font-medium">
-                          <Edit className="h-3.5 w-3.5" />
-                          Edit Mode - Make your changes below
-                        </div>
-                        <textarea
-                          value={editReason}
-                          onChange={(e) => setEditReason(e.target.value)}
-                          placeholder="Please explain why you are editing this score..."
-                          className="w-full border border-gray-300 rounded px-3 py-2 text-xs text-black focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
-                          rows={3}
-                        />
-                        <button
-                          onClick={() => submitScores(selectedAssignmentId, 'SUBMITTED')}
-                          disabled={isSubmittingScore || !editReason}
-                          className="w-full bg-black hover:bg-gray-800 disabled:bg-gray-400 text-white px-3 py-2 rounded text-xs flex items-center justify-center gap-1.5 font-medium"
-                        >
-                          {isSubmittingScore ? (
-                            <>
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              Submitting Edit...
-                            </>
-                          ) : (
-                            'Submit Edited Score'
-                          )}
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="w-full bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded text-xs flex items-center justify-center gap-1.5 font-medium">
-                        <CheckCircle className="h-3.5 w-3.5" />
-                        Score {scoreStatus[selectedAssignmentId] === 'FINALIZED' ? 'Finalized' : 'Submitted'}
-                      </div>
-                    )
-                  ) : (
-                    <button
-                      onClick={() => submitScores(selectedAssignmentId, 'SUBMITTED')}
-                      disabled={isSubmittingScore}
-                      className="w-full bg-black hover:bg-gray-800 disabled:bg-gray-400 text-white px-3 py-2 rounded text-xs flex items-center justify-center gap-1.5 font-medium"
-                    >
-                      {isSubmittingScore ? (
-                        <>
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          Submitting Final...
-                        </>
-                      ) : (
-                        'Submit Final Score'
-                      )}
-                    </button>
-                  )}
-                </div>
-
                 </div>
           </div>
           </div>
@@ -1279,6 +1260,19 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
             />
           </div>
         </div>
+        </div>
+
+                <ScoringFooterBar
+                  activityTitle={
+                    selectedActivity
+                      ? selectedActivity.displayName || selectedActivity.activityDetail.name
+                      : ''
+                  }
+                  scoredCompetencies={assignmentProgress.scored}
+                  totalCompetencies={assignmentProgress.total}
+                  collapsed={footerCollapsed}
+                  onToggleCollapsed={() => setFooterCollapsed((prev) => !prev)}
+                />
         </div>
           );
         })()}
