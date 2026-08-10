@@ -14,14 +14,15 @@ import {
   mergeAssignmentSubCompCommentsFromApi,
   normalizeStoredToLevel,
 } from './lib/rubric';
-import { DocumentSubmissionPreview } from './lib/submissionPreview';
 import type {
   AssessorScore,
   ActivityWithSubmissions,
   EvaluationResponse,
   ParticipantDetails,
+  SubmissionRecord,
 } from './lib/types';
 import CompetencyRail from './components/CompetencyRail';
+import EvidencePanel from './components/EvidencePanel';
 import CompetencyScoreCard from './components/CompetencyScoreCard';
 
 
@@ -75,10 +76,12 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
   const [activeCompetencyId, setActiveCompetencyId] = useState<string | null>(null);
   const [activeSubCompIndex, setActiveSubCompIndex] = useState(0);
   const [competencyCardCollapsed, setCompetencyCardCollapsed] = useState(false);
+  const [activeSubmissionId, setActiveSubmissionId] = useState<string | null>(null);
 
   useEffect(() => {
     setActiveCompetencyId(null);
     setActiveSubCompIndex(0);
+    setActiveSubmissionId(null);
   }, [selectedActivityId]);
 
   // Get assessmentCenterId and edit mode from URL query params
@@ -1072,6 +1075,17 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
           );
           const activeCompetency = activityCompetencies[activeCompetencyIndex] ?? null;
 
+          const selectedActivityWithSubs = selectedActivity as ActivityWithSubmissions | undefined;
+          // Fall back to the single `submission` when the API omitted `allSubmissions`, so an
+          // activity can't read "Submitted" in the rail and "No submissions yet" here.
+          const evidenceSubmissions: SubmissionRecord[] =
+            selectedActivityWithSubs?.allSubmissions &&
+            selectedActivityWithSubs.allSubmissions.length > 0
+              ? (selectedActivityWithSubs.allSubmissions as SubmissionRecord[])
+              : selectedActivity?.submission
+                ? [selectedActivity.submission as SubmissionRecord]
+                : [];
+
           const isScoringDisabled =
             (scoreStatus[selectedAssignmentId] === 'SUBMITTED' ||
               scoreStatus[selectedAssignmentId] === 'FINALIZED') &&
@@ -1175,6 +1189,19 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
                   <p className="text-xs text-gray-600 mt-0.5">{selectedAssignment.assessmentCenter.description}</p>
                 </div>
                 
+                {/* Evidence for the selected activity */}
+                {selectedActivity && (
+                  <div className="mb-4">
+                    <EvidencePanel
+                      activityLabel={selectedActivity.displayName || selectedActivity.activityDetail.name}
+                      activityType={selectedActivity.activityType}
+                      submissions={evidenceSubmissions}
+                      activeSubmissionId={activeSubmissionId}
+                      onSelectSubmission={setActiveSubmissionId}
+                    />
+                  </div>
+                )}
+
                 {/* Single-competency scoring, driven by the activity and competency rails */}
                 {activeCompetency ? (
                   <CompetencyScoreCard
@@ -1271,265 +1298,6 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
                   )}
                 </div>
 
-                </div>
-          </div>
-          </div>
-
-          {/* Submissions Section */}
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
-                <div className="flex justify-between items-center mb-3">
-                  <h3 className="text-base font-semibold text-black">Submissions</h3>
-              <p className="text-xs text-black">
-                    {selectedAssignment.submissionCount || 0}/{selectedAssignment.totalActivities || 0} Submitted
-              </p>
-            </div>
-            
-                {/* Activity Tabs */}
-                <div className="mb-3 border-b border-gray-300">
-                  <div className="flex gap-0 overflow-x-auto">
-                    {selectedAssignment.activities
-                      .sort((a, b) => a.displayOrder - b.displayOrder)
-                      .map((activity, index) => {
-                        const activityWithSubs = activity as ActivityWithSubmissions;
-                        const allSubmissions = activityWithSubs.allSubmissions || [];
-                        const hasSubmissions = allSubmissions.length > 0 || Boolean(activity.submission);
-                        const isSelected = selectedActivityId === activity.activityId;
-                        
-                        return (
-                          <button
-                            key={activity.activityId}
-                            onClick={() => setSelectedActivityId(activity.activityId)}
-                            className={`relative px-3 py-2 text-xs font-medium whitespace-nowrap transition-all ${
-                              isSelected
-                                ? 'text-black border-b-2 border-black bg-white'
-                                : 'text-gray-600 hover:text-black hover:bg-gray-50'
-                            } ${index === 0 ? 'ml-0' : ''}`}
-                          >
-                            {activity.displayName || activity.activityDetail.name}
-                            {hasSubmissions && (
-                              <span className="ml-1.5 text-xs bg-gray-800 text-white px-1 py-0.5 rounded">
-                                {allSubmissions.length || 1}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                  </div>
-                </div>
-
-                {/* Selected Activity Content */}
-                {selectedActivityId && (() => {
-                  const selectedActivity = selectedAssignment.activities.find(
-                    a => a.activityId === selectedActivityId
-                  );
-              
-              if (!selectedActivity) return null;
-              
-              const selectedActivityWithSubs = selectedActivity as ActivityWithSubmissions;
-              const allSubmissions = selectedActivityWithSubs.allSubmissions || [];
-              
-              interface Submission {
-                id: string;
-                parentSubmissionId?: string;
-                createdAt?: string;
-                submittedAt?: string;
-                replies?: Submission[];
-              }
-              
-              const sortedSubmissions = [...allSubmissions].sort((a: Submission, b: Submission) => 
-                new Date(a.createdAt || a.submittedAt || 0).getTime() - new Date(b.createdAt || b.submittedAt || 0).getTime()
-              );
-
-              // Build thread hierarchy
-              const buildThread = (submissions: Submission[]): Submission[] => {
-                const submissionMap = new Map<string, Submission>();
-                const rootSubmissions: Submission[] = [];
-
-                submissions.forEach(sub => {
-                  submissionMap.set(sub.id, sub);
-                });
-
-                submissions.forEach(sub => {
-                  if (!sub.parentSubmissionId) {
-                    rootSubmissions.push(sub);
-                  }
-                });
-
-                const addChildren = (parent: Submission): Submission => {
-                  const children = submissions.filter(s => s.parentSubmissionId === parent.id);
-                  return {
-                    ...parent,
-                    replies: children.map(child => addChildren(child))
-                  };
-                };
-
-                return rootSubmissions.map(root => addChildren(root));
-              };
-
-              const threadStructure = buildThread(sortedSubmissions);
-
-              return (
-                <div className="space-y-3">
-                  {/* Submissions only (activity context is on the left) */}
-                  {sortedSubmissions.length > 0 ? (
-                <div className="space-y-3">
-                      <h5 className="font-medium text-sm text-black">Submissions ({sortedSubmissions.length})</h5>
-                      
-                      {selectedActivity.activityType === 'INBOX_ACTIVITY' ? (
-                        /* Email Thread View */
-                        <div className="space-y-3">
-                          {threadStructure.map((thread: Submission) => {
-                            interface EmailSubmission extends Submission {
-                              notes?: string;
-                              textContent?: string;
-                              submissionStatus?: string;
-                              fileName?: string;
-                            }
-                            
-                            const renderSubmission = (sub: EmailSubmission, depth: number = 0) => {
-                              try {
-                                const notes = sub.notes ? JSON.parse(sub.notes) : {};
-                                const subject = notes.subject || 'Email Reply';
-                                const to = notes.to || [];
-                                const cc = notes.cc || [];
-                                
-                                return (
-                                  <div key={sub.id} className={`bg-white border border-gray-200 rounded p-3 ${depth > 0 ? 'ml-6 border-l-2 border-l-gray-300' : ''}`}>
-                                    <div className="flex justify-between items-start mb-1.5">
-                    <div>
-                                        <p className="font-semibold text-sm text-black">{subject}</p>
-                                        <p className="text-xs text-gray-600 mt-0.5">
-                                          {Array.isArray(to) ? to.join(', ') : to}
-                                          {cc && cc.length > 0 && ` | CC: ${Array.isArray(cc) ? cc.join(', ') : cc}`}
-                                        </p>
-                      </div>
-                                      <div className="text-right">
-                                        <span className={`text-xs px-1.5 py-0.5 rounded border ${
-                                          sub.submissionStatus === 'SUBMITTED' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                                        }`}>
-                                          {sub.submissionStatus || 'SUBMITTED'}
-                                        </span>
-                                        <p className="text-xs text-gray-500 mt-0.5">
-                                          {new Date(sub.submittedAt || sub.createdAt || Date.now()).toLocaleString()}
-                                        </p>
-                            </div>
-                          </div>
-                                    <div 
-                                      className="prose prose-sm max-w-none text-xs text-gray-800 mt-2 p-2 bg-gray-50 rounded border border-gray-200"
-                                      dangerouslySetInnerHTML={{ __html: sub.textContent || '<p>No content</p>' }}
-                                    />
-                                    {sub.fileName && (
-                                      <div className="mt-1.5 text-xs text-gray-700 flex items-center gap-1">
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.414a2 2 0 00-2.828-2.828L9 10.172 7.586 8.586a2 2 0 10-2.828 2.828l4 4a2 2 0 002.828 0L16.828 9.828a2 2 0 000-2.828z" />
-                                        </svg>
-                                        {sub.fileName}
-                                      </div>
-                                    )}
-                                    {sub.replies && sub.replies.length > 0 && (
-                                      <div className="mt-3">
-                                        {sub.replies.map((reply: EmailSubmission) => renderSubmission(reply, depth + 1))}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              } catch {
-                                return (
-                                  <div key={sub.id} className={`bg-white border border-gray-200 rounded p-3 ${depth > 0 ? 'ml-6 border-l-2 border-l-gray-300' : ''}`}>
-                                    <div className="flex justify-between items-start mb-1.5">
-                                      <p className="font-semibold text-sm text-black">Submission</p>
-                                      <span className={`text-xs px-1.5 py-0.5 rounded border ${
-                                        sub.submissionStatus === 'SUBMITTED' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                                      }`}>
-                                        {sub.submissionStatus || 'SUBMITTED'}
-                                      </span>
-                                    </div>
-                                    <div 
-                                      className="prose prose-sm max-w-none text-xs text-gray-800 mt-2"
-                                      dangerouslySetInnerHTML={{ __html: sub.textContent || '<p>No content</p>' }}
-                                    />
-                                  </div>
-                                );
-                              }
-                            };
-                            
-                            return renderSubmission(thread);
-                          })}
-                    </div>
-                  ) : (
-                        /* Case Study or Other Activity Types */
-                        <div className="space-y-2.5">
-                          {sortedSubmissions.map((sub: Submission & { submissionType?: string; submissionStatus?: string; fileUrl?: string; fileName?: string; fileSize?: number; textContent?: string; notes?: string }) => (
-                            <div key={sub.id} className="bg-white border border-gray-200 rounded p-3">
-                              <div className="flex justify-between items-start mb-1.5">
-                                <div>
-                                  <p className="font-semibold text-sm text-black">{selectedActivity.displayName || selectedActivity.activityDetail.name}</p>
-                                  <p className="text-xs text-gray-600 mt-0.5">
-                                    Type: {sub.submissionType || 'TEXT'}
-                                  </p>
-                                </div>
-                                <div className="text-right">
-                                  <span className={`text-xs px-1.5 py-0.5 rounded border ${
-                                    sub.submissionStatus === 'SUBMITTED' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                                  }`}>
-                                    {sub.submissionStatus || 'SUBMITTED'}
-                                  </span>
-                                  <p className="text-xs text-gray-500 mt-0.5">
-                                    {new Date(sub.submittedAt || sub.createdAt || Date.now()).toLocaleString()}
-                                  </p>
-                                </div>
-                              </div>
-                              
-                              {sub.submissionType === 'VIDEO' && sub.fileUrl && (
-                                <div className="mt-2">
-                                  <video controls className="w-full h-48 bg-black rounded" preload="metadata">
-                                    <source src={sub.fileUrl} type="video/mp4" />
-                                    Your browser does not support the video tag.
-                                  </video>
-                                  {sub.fileName && <p className="text-xs text-gray-600 mt-1.5 flex items-center gap-1">
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.414a2 2 0 00-2.828-2.828L9 10.172 7.586 8.586a2 2 0 10-2.828 2.828l4 4a2 2 0 002.828 0L16.828 9.828a2 2 0 000-2.828z" />
-                                    </svg>
-                                    {sub.fileName}
-                                  </p>}
-                    </div>
-                  )}
-                              
-                              {sub.submissionType === 'DOCUMENT' && sub.fileUrl && (
-                                <DocumentSubmissionPreview
-                                  fileUrl={sub.fileUrl}
-                                  fileName={sub.fileName}
-                                  fileSize={sub.fileSize}
-                                />
-                              )}
-                              
-                              {sub.submissionType === 'TEXT' && sub.textContent && (
-                                <div 
-                                  className="prose prose-sm max-w-none text-xs text-gray-800 mt-2 p-2 bg-gray-50 rounded border border-gray-200"
-                                  dangerouslySetInnerHTML={{ __html: sub.textContent }}
-                                />
-                              )}
-                              
-                              {sub.notes && (
-                            <div className="mt-1.5 text-xs text-gray-600">
-                                  <p><strong className="text-black">Notes:</strong> {sub.notes}</p>
-                            </div>
-                          )}
-                        </div>
-                          ))}
-                    </div>
-                  )}
-                </div>
-                  ) : (
-                    <div className="text-center py-6 text-sm text-gray-500">
-                      <p>No submissions yet for this activity</p>
-                </div>
-              )}
-            </div>
-              );
-            })()}
                 </div>
           </div>
           </div>
