@@ -21,6 +21,7 @@ import type {
   EvaluationResponse,
   ParticipantDetails,
 } from './lib/types';
+import CompetencyRail from './components/CompetencyRail';
 import CompetencyScoreCard from './components/CompetencyScoreCard';
 
 
@@ -1164,7 +1165,7 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
                     </div>
                   </div>
                 )}
-        <div className="flex min-h-0 flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-4 lg:h-[min(1200px,calc(100vh-9rem))]">
+        <div className="flex min-h-0 flex-col gap-4 xl:flex-row xl:items-stretch xl:gap-4 xl:h-[min(1200px,calc(100vh-9rem))]">
           {/* Competency Section */}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -1531,6 +1532,29 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
             })()}
                 </div>
           </div>
+          </div>
+
+          {/* Competencies in this activity */}
+          <div className="flex min-h-0 w-full flex-col xl:w-80 xl:flex-shrink-0">
+            <CompetencyRail
+              competencies={activityCompetencies}
+              activeCompetencyId={activeCompetency?.id ?? null}
+              activeSubCompIndex={activeSubCompIndex}
+              selectedKeys={
+                selectedActivity ? activitySelectedScoreKeys[selectedActivity.activityId] : undefined
+              }
+              scores={
+                selectedActivity ? activityCompetencyScores[selectedActivity.activityId] : undefined
+              }
+              onSelectCompetency={(id) => {
+                setActiveCompetencyId(id);
+                setActiveSubCompIndex(0);
+              }}
+              onSelectSubCompetency={(id, index) => {
+                setActiveCompetencyId(id);
+                setActiveSubCompIndex(index);
+              }}
+            />
           </div>
         </div>
         </div>
