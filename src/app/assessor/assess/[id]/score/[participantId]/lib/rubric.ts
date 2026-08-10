@@ -1,4 +1,9 @@
-import type { Competency } from './types';
+import type {
+  Competency,
+  ProgressStatus,
+  ScoresByCompetency,
+  SelectedKeysByCompetency,
+} from './types';
 
 export const getInteractiveActivityTypeBadge = (type?: string) => {
   switch (type) {
@@ -136,4 +141,74 @@ export function averageAcrossAllActivities(
   }
   if (avgs.length === 0) return null;
   return avgs.reduce((x, y) => x + y, 0) / avgs.length;
+}
+
+/** Labels from the mockup's 5-point scale. Only used when a rubric has exactly 5 levels. */
+export const FIVE_LEVEL_LABELS = [
+  'Does Not Demonstrate',
+  'Rarely Demonstrates',
+  'Sometimes Demonstrates',
+  'Often Demonstrates',
+  'Consistently Demonstrates',
+] as const;
+
+/** Short labels for the score circles, or null when the rubric is not 5-level. */
+export function getLevelLabels(numLevels: number): readonly string[] | null {
+  return numLevels === 5 ? FIVE_LEVEL_LABELS : null;
+}
+
+/**
+ * A sub-competency counts as scored when a rubric level was picked, or — for numeric rows with
+ * no rubric — when its value is above zero. Rubric rows always have a selected key; numeric
+ * rows never do, so both branches are needed.
+ */
+export function isSubCompetencyScored(
+  selectedScoreKey: string | undefined,
+  score: number | undefined
+): boolean {
+  if (selectedScoreKey) return true;
+  return typeof score === 'number' && score > 0;
+}
+
+export function countScoredSubCompetencies(
+  subNames: string[],
+  selectedKeys: Record<string, string> | undefined,
+  scores: Record<string, number> | undefined
+): number {
+  return subNames.reduce(
+    (total, sub) => total + (isSubCompetencyScored(selectedKeys?.[sub], scores?.[sub]) ? 1 : 0),
+    0
+  );
+}
+
+export function getCompetencyProgress(
+  competency: Competency,
+  selectedKeys: SelectedKeysByCompetency | undefined,
+  scores: ScoresByCompetency | undefined
+): { scored: number; total: number; complete: boolean } {
+  const total = competency.subCompetencyNames.length;
+  const scored = countScoredSubCompetencies(
+    competency.subCompetencyNames,
+    selectedKeys?.[competency.id],
+    scores?.[competency.id]
+  );
+  return { scored, total, complete: total > 0 && scored === total };
+}
+
+/** Activity progress counts fully-scored competencies, not sub-competencies. */
+export function getActivityProgress(
+  competencies: Competency[],
+  selectedKeys: SelectedKeysByCompetency | undefined,
+  scores: ScoresByCompetency | undefined
+): { scored: number; total: number } {
+  let scored = 0;
+  for (const competency of competencies) {
+    if (getCompetencyProgress(competency, selectedKeys, scores).complete) scored++;
+  }
+  return { scored, total: competencies.length };
+}
+
+export function deriveProgressStatus(scored: number, total: number): ProgressStatus {
+  if (total > 0 && scored >= total) return 'completed';
+  return scored > 0 ? 'in_progress' : 'not_started';
 }
