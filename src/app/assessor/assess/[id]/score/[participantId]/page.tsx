@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Loader2, ArrowLeft } from 'lucide-react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
 import {
@@ -42,7 +42,6 @@ interface ParticipantScoringProps {
 const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
   const { participantId } = React.use(params);
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { assessorId, token } = useAuth();
   const [participantDetails, setParticipantDetails] = useState<ParticipantDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -916,11 +915,11 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-7xl mx-auto">
+    <div className="flex min-h-screen flex-col bg-gray-50">
+      <div className="flex min-h-0 flex-1 flex-col">
         {/* Only show assignment selector if assessmentCenterId not provided and multiple assignments exist */}
         {!assessmentCenterId && participantDetails.data.assignments.length > 1 && (
-          <div className="mt-4 bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+          <div className="m-4 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
             <h3 className="text-sm font-semibold mb-2 text-black">Select Assessment Center</h3>
             <div className="flex gap-2 flex-wrap">
               {participantDetails.data.assignments.map((assignment) => (
@@ -1143,7 +1142,7 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
                     </div>
                   </div>
                 )}
-        <div className="flex min-h-0 flex-col gap-4 xl:flex-row xl:items-stretch xl:gap-4 xl:h-[min(1200px,calc(100vh-9rem))]">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 xl:flex-row xl:items-stretch xl:gap-4">
           {/* Activities + participant */}
           <div className="scrollbar-thin flex min-h-0 w-full flex-col gap-4 overflow-y-auto xl:w-72 xl:flex-shrink-0">
             <ActivityRail
@@ -1151,33 +1150,26 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
               selectedActivityId={selectedActivityId}
               onSelectActivity={setSelectedActivityId}
             />
-            <div className="order-last">
-              <ParticipantOverview
-                name={participantDetails.data.participant.name}
-                participantId={participantDetails.data.participant.id}
-                program={
-                  selectedAssignment.assessmentCenter.displayName ||
-                  selectedAssignment.assessmentCenter.name
-                }
-                totalCompetencies={selectedAssignment.competencies.length}
-                activityCount={selectedAssignment.activities.length}
-                isGenerating={isGenerating}
-                isEvaluating={isEvaluating}
-                onGenerateReport={generateReport}
-                onEvaluate={evaluateInterview}
-              />
-            </div>
+            <ParticipantOverview
+              name={participantDetails.data.participant.name}
+              participantId={participantDetails.data.participant.id}
+              program={
+                selectedAssignment.assessmentCenter.displayName ||
+                selectedAssignment.assessmentCenter.name
+              }
+              totalCompetencies={selectedAssignment.competencies.length}
+              activityCount={selectedAssignment.activities.length}
+              isGenerating={isGenerating}
+              isEvaluating={isEvaluating}
+              onGenerateReport={generateReport}
+              onEvaluate={evaluateInterview}
+            />
           </div>
 
           {/* Competency Section */}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
-                <div className="mb-3">
-                  <h3 className="text-base font-semibold text-black">{selectedAssignment.assessmentCenter.displayName}</h3>
-                  <p className="text-xs text-gray-600 mt-0.5">{selectedAssignment.assessmentCenter.description}</p>
-                </div>
-                
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
                 {/* Evidence for the selected activity */}
                 {selectedActivity && (
                   <div className="mb-4">
@@ -1260,6 +1252,8 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
             />
           </div>
         </div>
+
+                <EvaluationResults data={evaluationData} />
         </div>
 
                 <ScoringFooterBar
@@ -1276,9 +1270,6 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
         </div>
           );
         })()}
-
-        {/* Evaluation Results */}
-        <EvaluationResults data={evaluationData} />
       </div>
     </div>
   );
