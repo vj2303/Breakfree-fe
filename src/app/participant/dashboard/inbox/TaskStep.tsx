@@ -259,7 +259,7 @@ const TaskStep: React.FC<TaskStepProps> = ({
               <input
                 key={fileInputKey}
                 type="file"
-                accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+                accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.jpg,.jpeg,.png"
                 onChange={handleFileChange}
                 className="hidden"
                 id="file-upload"
