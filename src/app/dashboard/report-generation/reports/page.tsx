@@ -10,9 +10,17 @@ export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<'participants' | 'management'>('management');
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[#f8fafd]">
       {/* Header with Tabs */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="border-b border-gray-200 bg-white px-6 pb-4 pt-5">
+        <div className="mb-4">
+          <h1 className="text-2xl font-semibold leading-tight text-black">Reports</h1>
+          <p className="mt-1 text-sm text-gray-600">
+            {activeTab === 'management'
+              ? 'Organizational view of assessment progress and competency performance'
+              : 'Generate and download individual participant reports'}
+          </p>
+        </div>
         <div className="flex items-center justify-between">
           <div className="flex gap-3">
             <button

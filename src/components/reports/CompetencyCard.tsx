@@ -15,104 +15,80 @@ interface CompetencyCardProps {
   onSearchChange: (value: string) => void;
 }
 
+/** Scores are on a 0-5 scale, matching the gauge this table replaced. */
+const MAX_SCORE = 5;
+
 const CompetencyCard: React.FC<CompetencyCardProps> = ({
   competencies,
   searchValue,
   onSearchChange,
 }) => {
-  // Color palette for gauges - black and white theme
-  const colors = [
-    { bg: 'bg-black', text: 'text-black' },
-    { bg: 'bg-gray-600', text: 'text-black' },
-    { bg: 'bg-gray-400', text: 'text-black' },
-    { bg: 'bg-gray-500', text: 'text-black' },
-  ];
-
-  const strokeColors = ['#000000', '#404040', '#808080', '#606060'];
-
-  const CircularGauge: React.FC<{ score: number; color: typeof colors[0]; index: number }> = ({
-    score,
-    color,
-    index,
-  }) => {
-    const maxScore = 5; // Assuming max score is 5
-    const percentage = (score / maxScore) * 100;
-    const circumference = 2 * Math.PI * 45; // radius = 45
-    const strokeDasharray = circumference;
-    const strokeDashoffset = circumference - (percentage / 100) * circumference;
-
-    return (
-      <div className="flex flex-col items-center">
-        <div className="relative w-20 h-20">
-          <svg className="transform -rotate-90 w-20 h-20">
-            <circle
-              cx="40"
-              cy="40"
-              r="37"
-              stroke="#d1d5db"
-              strokeWidth="4"
-              fill="none"
-            />
-            <circle
-              cx="40"
-              cy="40"
-              r="37"
-              stroke={strokeColors[index]}
-              strokeWidth="4"
-              fill="none"
-              strokeDasharray={strokeDasharray}
-              strokeDashoffset={strokeDashoffset}
-              strokeLinecap="round"
-              className="transition-all duration-500"
-            />
-          </svg>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className={`text-sm font-bold ${color.text}`}>{score.toFixed(1)}</span>
-          </div>
-        </div>
-        <p className="text-xs text-black mt-1.5 text-center max-w-[100px] truncate">
-          {competencies[index]?.competencyName || 'Competency'}
-        </p>
-      </div>
-    );
-  };
+  // Weakest first, so the competencies needing attention lead.
+  const ranked = [...competencies].sort((a, b) => a.averageScore - b.averageScore);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-      <div className="border-b border-gray-200 px-4 py-3">
+    <div className="flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="px-5 pb-3 pt-4">
         <h2 className="text-base font-semibold text-black">Competency</h2>
-        <p className="text-sm text-gray-600 mt-1">Average score of the competency</p>
+        <p className="mt-0.5 text-xs text-gray-600">
+          Average score of the competency, lowest first
+        </p>
       </div>
 
-      {/* Search Bar */}
-      <div className="px-4 py-3 border-b border-gray-200 relative">
-        <Search className="absolute left-6 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-        <input
-          type="text"
-          placeholder="Search by Competency name"
-          value={searchValue}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-black bg-white"
-        />
+      <div className="px-5">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by Competency name"
+            value={searchValue}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-black focus:border-black focus:outline-none"
+          />
+        </div>
       </div>
 
-      {/* Competency Gauges */}
-      <div className="px-4 py-3">
-        {competencies.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {competencies.slice(0, 4).map((competency, index) => (
-              <CircularGauge
-                key={competency.competencyId}
-                score={competency.averageScore}
-                color={colors[index % colors.length]}
-                index={index}
-              />
-            ))}
-          </div>
+      <div className="px-5 pb-5 pt-3">
+        {ranked.length > 0 ? (
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-200 text-left text-[11px] font-medium text-gray-600">
+                <th className="pb-2">Competency</th>
+                <th className="w-24 pb-2 text-right">Avg. Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ranked.map((competency) => {
+                const pct = Math.min(
+                  Math.max((competency.averageScore / MAX_SCORE) * 100, 0),
+                  100
+                );
+                return (
+                  <tr key={competency.competencyId} className="border-b border-gray-100 last:border-0">
+                    <td className="py-2.5 pr-3">
+                      <p className="truncate text-sm text-black" title={competency.competencyName}>
+                        {competency.competencyName}
+                      </p>
+                      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+                        <div
+                          className="h-full rounded-full bg-gray-600 transition-all duration-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </td>
+                    <td className="py-2.5 text-right align-top">
+                      <span className="text-sm font-semibold tabular-nums text-black">
+                        {competency.averageScore.toFixed(1)}
+                      </span>
+                      <span className="text-xs text-gray-400"> / {MAX_SCORE}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         ) : (
-          <div className="text-center py-6 text-sm text-gray-600">
-            No competency data available
-          </div>
+          <div className="py-6 text-center text-sm text-gray-600">No competency data available</div>
         )}
       </div>
     </div>
@@ -120,4 +96,3 @@ const CompetencyCard: React.FC<CompetencyCardProps> = ({
 };
 
 export default CompetencyCard;
-

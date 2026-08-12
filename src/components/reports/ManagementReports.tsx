@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import AssessmentsCard from './AssessmentsCard';
+import AssessmentStatTiles from './AssessmentStatTiles';
 import CompetencyCard from './CompetencyCard';
 import GroupsList from './GroupsList';
 import GroupDetails from './GroupDetails';
@@ -418,11 +419,11 @@ const ManagementReports: React.FC<ManagementReportsProps> = ({ token }) => {
   return (
     <div className="space-y-4">
       {/* Filter Section - At the Top */}
-      <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-        <div className="px-4 py-3 flex items-center gap-4 flex-wrap">
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-end gap-3 px-5 py-4">
           {/* Group Filter */}
           <div className="flex-1 min-w-[250px]">
-            <label className="block text-sm font-semibold text-black mb-2">
+            <label className="mb-1.5 block text-xs font-medium text-gray-600">
               Filter using Groups
             </label>
             <select
@@ -437,7 +438,7 @@ const ManagementReports: React.FC<ManagementReportsProps> = ({ token }) => {
                   setShowGraphs(false);
                 }
               }}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg text-black focus:border-black focus:outline-none bg-white"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-black focus:border-black focus:outline-none"
             >
               <option value="">All Groups</option>
               {groups.map((group) => (
@@ -451,7 +452,7 @@ const ManagementReports: React.FC<ManagementReportsProps> = ({ token }) => {
           {/* Participant Filter - Only show when group is selected */}
           {selectedGroup && groupParticipants.length > 0 && (
             <div className="flex-1 min-w-[250px]">
-              <label className="block text-sm font-semibold text-black mb-2">
+              <label className="mb-1.5 block text-xs font-medium text-gray-600">
                 Filter Participants
               </label>
               <select
@@ -467,7 +468,7 @@ const ManagementReports: React.FC<ManagementReportsProps> = ({ token }) => {
                     setShowGraphs(false);
                   }
                 }}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg text-black focus:border-black focus:outline-none bg-white"
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-black focus:border-black focus:outline-none"
               >
                 <option value="">All Participants</option>
                 {groupParticipants.map((participant) => (
@@ -482,7 +483,7 @@ const ManagementReports: React.FC<ManagementReportsProps> = ({ token }) => {
           {/* Assessment Center Filter - Only show when participant is selected and has multiple centers */}
           {filteredParticipant && uniqueAssessmentCenters.length > 1 && (
             <div className="flex-1 min-w-[250px]">
-              <label className="block text-sm font-semibold text-black mb-2">
+              <label className="mb-1.5 block text-xs font-medium text-gray-600">
                 Select Assessment Center
               </label>
               <select
@@ -499,7 +500,7 @@ const ManagementReports: React.FC<ManagementReportsProps> = ({ token }) => {
                     setAssessmentCenterActivities([]);
                   }
                 }}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg text-black focus:border-black focus:outline-none bg-white"
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-black focus:border-black focus:outline-none"
                 disabled={assignmentsLoading}
               >
                 <option value="">All Assessment Centers</option>
@@ -524,7 +525,7 @@ const ManagementReports: React.FC<ManagementReportsProps> = ({ token }) => {
                   setParticipantAssignments([]);
                   setShowGraphs(false);
                 }}
-                className="px-4 py-2 text-sm font-medium text-black border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-black transition-colors hover:bg-gray-50"
               >
                 Clear Filters
               </button>
@@ -534,11 +535,11 @@ const ManagementReports: React.FC<ManagementReportsProps> = ({ token }) => {
 
         {/* Active Filters Display */}
         {(selectedGroup || filteredParticipant || selectedAssessmentCenter) && (
-          <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+          <div className="border-t border-gray-200 bg-gray-50 px-5 py-3">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-medium text-gray-600">Active Filters:</span>
+              <span className="text-xs font-medium text-gray-600">Active Filters:</span>
               {selectedGroup && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white border border-gray-300 rounded-lg text-xs font-medium text-black">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-black">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
@@ -546,7 +547,7 @@ const ManagementReports: React.FC<ManagementReportsProps> = ({ token }) => {
                 </span>
               )}
               {filteredParticipant && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white border border-gray-300 rounded-lg text-xs font-medium text-black">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-black">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
@@ -554,7 +555,7 @@ const ManagementReports: React.FC<ManagementReportsProps> = ({ token }) => {
                 </span>
               )}
               {selectedAssessmentCenter && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white border border-gray-300 rounded-lg text-xs font-medium text-black">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-black">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                   </svg>
@@ -568,7 +569,7 @@ const ManagementReports: React.FC<ManagementReportsProps> = ({ token }) => {
 
       {/* Assessment Details Section - Replaces top cards when participant and assessment center are selected */}
       {filteredParticipant && participantAssignments.length > 0 && (uniqueAssessmentCenters.length === 1 || selectedAssessmentCenter) ? (
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
           <div className="border-b border-gray-200 px-4 py-3">
             <h3 className="text-base font-bold text-black">Assessment Details</h3>
             {filteredParticipant && (
@@ -726,14 +727,17 @@ const ManagementReports: React.FC<ManagementReportsProps> = ({ token }) => {
         </div>
       ) : (
         /* Assessments and Competency Cards - Show when no participant/assessment center selected */
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <AssessmentsCard data={overviewData} />
-          <CompetencyCard
-            competencies={filteredCompetencies}
-            searchValue={competencySearch}
-            onSearchChange={setCompetencySearch}
-          />
-        </div>
+        <>
+          <AssessmentStatTiles data={overviewData} />
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <AssessmentsCard data={overviewData} />
+            <CompetencyCard
+              competencies={filteredCompetencies}
+              searchValue={competencySearch}
+              onSearchChange={setCompetencySearch}
+            />
+          </div>
+        </>
       )}
 
       {/* Groups List or Group Details - Hide when participant is selected */}
@@ -780,7 +784,7 @@ const ManagementReports: React.FC<ManagementReportsProps> = ({ token }) => {
       {/* Graphs Section - Only show when participant is selected from filter */}
       {filteredParticipant && showGraphs && (selectedAssessmentCenter || uniqueAssessmentCenters.length <= 1) && (
         <div className="space-y-4">
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+          <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
             <div className="border-b border-gray-200 px-4 py-3">
               <h3 className="text-base font-bold text-black">Performance Analytics</h3>
             </div>
@@ -810,7 +814,7 @@ const ManagementReports: React.FC<ManagementReportsProps> = ({ token }) => {
 
       {/* All Assessors Reports Section - Show when participant and assessment center are selected */}
       {filteredParticipant && (selectedAssessmentCenter || uniqueAssessmentCenters.length === 1) && (
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
           <div className="border-b border-gray-200 px-4 py-3">
             <h3 className="text-base font-bold text-black">All Assessors Reports</h3>
             <p className="text-sm text-gray-600 mt-1">
@@ -843,7 +847,7 @@ const ManagementReports: React.FC<ManagementReportsProps> = ({ token }) => {
 
       {/* Show message when participant selected but no assessment center selected (when multiple exist) */}
       {filteredParticipant && uniqueAssessmentCenters.length > 1 && !selectedAssessmentCenter && (
-        <div className="bg-white border border-gray-200 rounded-lg px-4 py-6 text-center">
+        <div className="rounded-xl border border-gray-200 bg-white px-5 py-8 text-center">
           <svg className="w-10 h-10 text-gray-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
           </svg>
@@ -854,7 +858,7 @@ const ManagementReports: React.FC<ManagementReportsProps> = ({ token }) => {
 
       {/* Show message when filters are applied but no participant selected for graphs */}
       {selectedGroup && !filteredParticipant && (
-        <div className="bg-white border border-gray-200 rounded-lg px-4 py-6 text-center">
+        <div className="rounded-xl border border-gray-200 bg-white px-5 py-8 text-center">
           <svg className="w-10 h-10 text-gray-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
           </svg>

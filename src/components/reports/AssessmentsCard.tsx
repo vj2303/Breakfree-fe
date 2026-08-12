@@ -2,117 +2,63 @@
 
 import React from 'react';
 
-interface OverviewData {
-  totalAssessments: number;
-  assigned: number;
-  inProgress: number;
-  completed: number;
-  assignedPercentage: number;
-  inProgressPercentage: number;
-  completedPercentage: number;
-}
+import { deriveAssessmentStats, type OverviewData } from './assessmentOverview';
 
 interface AssessmentsCardProps {
   data: OverviewData | null;
 }
 
 const AssessmentsCard: React.FC<AssessmentsCardProps> = ({ data }) => {
-  const defaultData = {
-    totalAssessments: 0,
-    assigned: 0,
-    inProgress: 0,
-    completed: 0,
-    assignedPercentage: 0,
-    inProgressPercentage: 0,
-    completedPercentage: 0,
-  };
-
-  const stats = data || defaultData;
-
-  const assignedCountFromApi = stats.assigned ?? 0;
-  const inProgressCount = stats.inProgress ?? 0;
-  const completedCount = stats.completed ?? 0;
-
-  // Use totalAssessments as the denominator for percentages; fall back to the
-  // largest of the three counts if totalAssessments is somehow under-reported.
-  const effectiveTotalForPercent =
-    Math.max(stats.totalAssessments ?? 0, assignedCountFromApi, inProgressCount, completedCount) || 0;
-
-  // Display the raw assigned count from the backend (= total activities with assessors).
-  // Each of the three bars is an independent cumulative metric relative to the total:
-  //   Assigned   = all activities that have been assigned to participants
-  //   In progress = activities where the participant has submitted a response
-  //   Completed  = activities that have been fully scored by an assessor
-  const assignedCount = assignedCountFromApi;
-
-  const clampPct = (pct: number) => Math.min(Math.max(pct, 0), 100);
-
-  const assignedPercentageRaw = effectiveTotalForPercent
-    ? clampPct((assignedCount / effectiveTotalForPercent) * 100)
-    : 0;
-  const inProgressPercentageRaw = effectiveTotalForPercent
-    ? clampPct((inProgressCount / effectiveTotalForPercent) * 100)
-    : 0;
-  const completedPercentageRaw = effectiveTotalForPercent
-    ? clampPct((completedCount / effectiveTotalForPercent) * 100)
-    : 0;
-
-  // Display whole numbers only (no decimals).
-  const roundPct = (pct: number) => Math.round(pct);
-
-  const assignedPercentage = roundPct(assignedPercentageRaw);
-  const inProgressPercentage = roundPct(inProgressPercentageRaw);
-  const completedPercentage = roundPct(completedPercentageRaw);
+  const stats = deriveAssessmentStats(data);
 
   const progressBars = [
     {
       label: 'Assigned',
-      count: assignedCount,
-      percentage: assignedPercentage,
+      count: stats.assignedCount,
+      percentage: stats.assignedPercentage,
       color: 'bg-gray-600',
-      textColor: 'text-black',
     },
     {
       label: 'In progress',
-      count: inProgressCount,
-      percentage: inProgressPercentage,
+      count: stats.inProgressCount,
+      percentage: stats.inProgressPercentage,
       color: 'bg-gray-400',
-      textColor: 'text-black',
     },
     {
       label: 'Completed',
-      count: completedCount,
-      percentage: completedPercentage,
+      count: stats.completedCount,
+      percentage: stats.completedPercentage,
       color: 'bg-black',
-      textColor: 'text-black',
     },
   ];
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-      <div className="border-b border-gray-200 px-4 py-3">
-        <h2 className="text-base font-semibold text-black">Assessments</h2>
-        <p className="text-sm text-gray-600 mt-1">
-          Total number of assessment: {effectiveTotalForPercent}
+    <div className="flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="px-5 pb-3 pt-4">
+        <h2 className="text-base font-semibold text-black">Assessment Progress</h2>
+        <p className="mt-0.5 text-xs text-gray-600">
+          Assigned, submitted and fully scored, out of {stats.total} assessments
         </p>
       </div>
 
-      <div className="px-4 py-3 space-y-4">
+      <div className="space-y-4 px-5 pb-5">
         {progressBars.map((bar) => (
-          <div key={bar.label} className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium text-black">{bar.label}</span>
-              <span className={`font-semibold ${bar.textColor}`}>{bar.percentage}%</span>
+          <div key={bar.label}>
+            <div className="mb-1.5 flex items-baseline justify-between">
+              <span className="text-xs font-medium text-black">{bar.label}</span>
+              <span className="text-xs text-gray-600">
+                <span className="font-semibold tabular-nums text-black">{bar.percentage}%</span>
+                <span className="ml-1.5 tabular-nums">
+                  {bar.count} of {stats.total}
+                </span>
+              </span>
             </div>
-            <div className="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
               <div
                 className={`${bar.color} h-full rounded-full transition-all duration-500`}
                 style={{ width: `${bar.percentage}%` }}
               />
             </div>
-            <p className="text-sm text-gray-600">
-              Number of assessment: {bar.count}
-            </p>
           </div>
         ))}
       </div>
@@ -121,4 +67,3 @@ const AssessmentsCard: React.FC<AssessmentsCardProps> = ({ data }) => {
 };
 
 export default AssessmentsCard;
-
