@@ -313,7 +313,7 @@ export default function ParticipantOverview({
   );
 
   return (
-    <div className="space-y-5">
+    <div className="view-enter-stagger space-y-5">
       {/* Breadcrumb + actions */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <nav className="flex items-center gap-1.5 text-sm">
