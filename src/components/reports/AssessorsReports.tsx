@@ -504,15 +504,19 @@ const AssessorsReports: React.FC<AssessorsReportsProps> = ({
             <div className="space-y-3">
               {overallAverages.map((compAvg) => (
                 <div key={compAvg.competencyId} className="bg-white border border-gray-200 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <h5 className="text-sm font-semibold text-black">{compAvg.competencyName}</h5>
-                    <span className="text-sm font-bold text-gray-900">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <h5 className="min-w-0 break-words text-sm font-semibold text-black">
+                      {compAvg.competencyName}
+                    </h5>
+                    <span className="flex-shrink-0 text-sm font-bold text-gray-900">
                       Avg: {compAvg.overallAverage.toFixed(2)}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                  {/* min-w-0 + break-words: sub-competency names are full sentences and would
+                      otherwise stretch the grid track past the card. */}
+                  <div className="grid grid-cols-1 gap-2 mt-2 sm:grid-cols-2 md:grid-cols-3">
                     {Object.entries(compAvg.subCompetencyAverages).map(([subComp, avg]) => (
-                      <div key={subComp} className="text-xs">
+                      <div key={subComp} className="min-w-0 break-words text-xs">
                         <span className="text-gray-600">{subComp}:</span>
                         <span className="ml-1 font-medium text-black">{avg.toFixed(2)}</span>
                       </div>
@@ -611,18 +615,20 @@ const AssessorsReports: React.FC<AssessorsReportsProps> = ({
                                   return (
                                     <div key={subComp} className="bg-white border border-gray-200 rounded-lg p-2">
                                       <div
-                                        className="flex items-center justify-between cursor-pointer"
+                                        className="flex items-start justify-between gap-2 cursor-pointer"
                                         onClick={() => toggleActivity(subCompKey)}
                                       >
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex min-w-0 items-start gap-2">
                                           {isSubCompExpanded ? (
-                                            <ChevronDown className="w-3.5 h-3.5 text-gray-700" />
+                                            <ChevronDown className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-gray-700" />
                                           ) : (
-                                            <ChevronRight className="w-3.5 h-3.5 text-gray-700" />
+                                            <ChevronRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-gray-700" />
                                           )}
-                                          <span className="text-xs font-semibold text-black">{subComp}</span>
+                                          <span className="min-w-0 break-words text-xs font-semibold text-black">
+                                            {subComp}
+                                          </span>
                                         </div>
-                                        <span className="text-xs font-bold text-black">
+                                        <span className="flex-shrink-0 text-xs font-bold text-black">
                                           {scoreValue !== null ? scoreValue : 'N/A'}
                                         </span>
                                       </div>

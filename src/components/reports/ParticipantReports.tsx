@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { ReportStructureApi, ReportStructure } from '@/lib/reportStructureApi';
-import { Download, Search, ArrowLeft, ChevronRight, Sparkles, Upload } from 'lucide-react';
+import { Download, Search, ArrowLeft, ChevronRight, LayoutDashboard, Sparkles, Upload } from 'lucide-react';
 import { API_V1_BASE_URL } from '@/lib/apiConfig';
 import { downloadParticipantReportPdf } from '@/lib/reports/participantReportPdf';
+import ParticipantOverview from './participantOverview/ParticipantOverview';
 
 interface ParticipantReportsProps {
   token: string | null;
@@ -51,6 +52,11 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
   const [readinessUploadStatus, setReadinessUploadStatus] = useState<{ acId: string; message: string; type: 'success' | 'error' } | null>(null);
   const readinessFileRef = React.useRef<HTMLInputElement>(null);
   const [pendingUploadACId, setPendingUploadACId] = useState<string | null>(null);
+  /** Set when an assessment center row is opened in the full Participant Overview. */
+  const [overviewTarget, setOverviewTarget] = useState<{
+    participant: ParticipantData;
+    assessmentCenter: AssessmentCenterData;
+  } | null>(null);
 
   // Fetch groups and report structures
   const fetchData = useCallback(async () => {
@@ -301,6 +307,30 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
     );
   }
 
+  // Full-page participant overview replaces the list while it is open.
+  if (overviewTarget) {
+    return (
+      <ParticipantOverview
+        participant={overviewTarget.participant}
+        assessmentCenter={overviewTarget.assessmentCenter}
+        cohortName={selectedGroup?.name || ''}
+        token={token}
+        isExporting={downloadingParticipantId === overviewTarget.participant.id}
+        onBack={() => setOverviewTarget(null)}
+        onExport={() =>
+          handleDownloadReport(overviewTarget.participant, overviewTarget.assessmentCenter.id)
+        }
+        onGenerateAIReport={() =>
+          handleGenerateAIReport(
+            overviewTarget.participant,
+            overviewTarget.assessmentCenter.id,
+            overviewTarget.assessmentCenter.displayName || overviewTarget.assessmentCenter.name
+          )
+        }
+      />
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* Hidden file input for readiness score upload */}
@@ -504,26 +534,38 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
                     className="border border-gray-200 rounded-lg p-4 hover:border-black transition-all"
                   >
                     {/* Participant Info */}
-                    <div className="grid grid-cols-5 gap-4 mb-4 pb-4 border-b border-gray-200">
-                      <div>
+                    {/* min-w-0 on each cell: long emails and designations would otherwise widen
+                        the grid track and push the row past the card. */}
+                    <div className="grid grid-cols-2 gap-4 mb-4 pb-4 border-b border-gray-200 md:grid-cols-3 xl:grid-cols-5">
+                      <div className="min-w-0">
                         <div className="text-sm text-gray-600 mb-1">User Code</div>
-                        <div className="text-sm font-medium text-black">{participant.userCode}</div>
+                        <div className="truncate text-sm font-medium text-black" title={participant.userCode}>
+                          {participant.userCode}
+                        </div>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <div className="text-sm text-gray-600 mb-1">Name</div>
-                        <div className="text-sm font-medium text-black">{participant.name}</div>
+                        <div className="truncate text-sm font-medium text-black" title={participant.name}>
+                          {participant.name}
+                        </div>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <div className="text-sm text-gray-600 mb-1">Email</div>
-                        <div className="text-sm text-black">{participant.email}</div>
+                        <div className="truncate text-sm text-black" title={participant.email}>
+                          {participant.email}
+                        </div>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <div className="text-sm text-gray-600 mb-1">Designation</div>
-                        <div className="text-sm text-black">{participant.designation}</div>
+                        <div className="truncate text-sm text-black" title={participant.designation}>
+                          {participant.designation}
+                        </div>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <div className="text-sm text-gray-600 mb-1">Manager</div>
-                        <div className="text-sm text-black">{participant.managerName || '-'}</div>
+                        <div className="truncate text-sm text-black" title={participant.managerName || '-'}>
+                          {participant.managerName || '-'}
+                        </div>
                       </div>
                     </div>
 
@@ -539,14 +581,21 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
                             return (
                               <div
                                 key={ac.id}
-                                className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg"
+                                className="flex flex-wrap items-center justify-between gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg"
                               >
-                                <div className="flex-1">
-                                  <div className="text-sm font-medium text-black">
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate text-sm font-medium text-black" title={ac.displayName || ac.name}>
                                     {ac.displayName || ac.name}
                                   </div>
                                 </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            onClick={() => setOverviewTarget({ participant, assessmentCenter: ac })}
+                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-black border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+                          >
+                            <LayoutDashboard className="w-4 h-4" />
+                            <span>Overview</span>
+                          </button>
                           <button
                             onClick={() => handleDownloadReport(participant, ac.id)}
                             disabled={!selectedReportStructure || isDownloading}
@@ -590,7 +639,7 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
                           </button>
                         </div>
                         {readinessUploadStatus && readinessUploadStatus.acId === ac.id && (
-                          <div className={`mt-2 text-xs px-3 py-1.5 rounded ${
+                          <div className={`w-full text-xs px-3 py-1.5 rounded ${
                             readinessUploadStatus.type === 'success'
                               ? 'bg-green-50 text-green-700 border border-green-200'
                               : 'bg-red-50 text-red-700 border border-red-200'

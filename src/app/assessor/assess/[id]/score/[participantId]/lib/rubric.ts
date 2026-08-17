@@ -212,3 +212,84 @@ export function deriveProgressStatus(scored: number, total: number): ProgressSta
   if (total > 0 && scored >= total) return 'completed';
   return scored > 0 ? 'in_progress' : 'not_started';
 }
+
+/** Sub-competencies with no rubric descriptors fall back to a plain 0–10 score. */
+export const NUMERIC_SCORE_MAX = 10;
+
+export interface ScoreTotals {
+  /** Points awarded so far. */
+  value: number;
+  /** Points available. */
+  max: number;
+  /** Sub-competencies that carry a score. */
+  scored: number;
+  /** Sub-competencies in scope. */
+  total: number;
+}
+
+/**
+ * Points for one sub-competency: the picked rubric level out of the number of levels,
+ * or the raw value out of 10 when the sub-competency has no descriptors.
+ * Display only — it re-reads the same state the pickers write.
+ */
+export function getSubCompetencyScore(
+  scoreDescriptions: Record<string, string>,
+  selectedScoreKey: string | undefined,
+  score: number | undefined
+): { value: number; max: number; scored: boolean } {
+  const keys = getSortedScoreKeysFromDescriptions(scoreDescriptions);
+  const scored = isSubCompetencyScored(selectedScoreKey, score);
+
+  if (keys.length === 0) {
+    return { value: score ?? 0, max: NUMERIC_SCORE_MAX, scored };
+  }
+
+  const level = selectedScoreKey
+    ? parseScoreKeyLevel(selectedScoreKey)
+    : normalizeStoredToLevel(score ?? 0, keys.length);
+  return { value: level, max: keys.length, scored };
+}
+
+/** Points across every sub-competency of a competency, for the "Competency Score: x / y" header. */
+export function getCompetencyScoreTotals(
+  competency: Competency,
+  scoreDescriptionsFor: (subComp: string) => Record<string, string>,
+  selectedKeys: Record<string, string> | undefined,
+  scores: Record<string, number> | undefined
+): ScoreTotals {
+  return competency.subCompetencyNames.reduce<ScoreTotals>(
+    (totals, subComp) => {
+      const { value, max, scored } = getSubCompetencyScore(
+        scoreDescriptionsFor(subComp),
+        selectedKeys?.[subComp],
+        scores?.[subComp]
+      );
+      return {
+        value: totals.value + value,
+        max: totals.max + max,
+        scored: totals.scored + (scored ? 1 : 0),
+        total: totals.total + 1,
+      };
+    },
+    { value: 0, max: 0, scored: 0, total: 0 }
+  );
+}
+
+/** Sum of competency totals, for the overall score dial. */
+export function sumScoreTotals(totals: ScoreTotals[]): ScoreTotals {
+  return totals.reduce<ScoreTotals>(
+    (acc, t) => ({
+      value: acc.value + t.value,
+      max: acc.max + t.max,
+      scored: acc.scored + t.scored,
+      total: acc.total + t.total,
+    }),
+    { value: 0, max: 0, scored: 0, total: 0 }
+  );
+}
+
+/** Totals expressed out of 100, rounded — `null` when nothing is scoreable yet. */
+export function toPercent(value: number, max: number): number | null {
+  if (max <= 0) return null;
+  return Math.round((value / max) * 100);
+}

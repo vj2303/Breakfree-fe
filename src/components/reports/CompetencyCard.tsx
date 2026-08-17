@@ -49,8 +49,9 @@ const CompetencyCard: React.FC<CompetencyCardProps> = ({
       </div>
 
       <div className="px-5 pb-5 pt-3">
+        {/* table-fixed keeps a long competency name inside the card instead of widening the row. */}
         {ranked.length > 0 ? (
-          <table className="w-full">
+          <table className="w-full table-fixed">
             <thead>
               <tr className="border-b border-gray-200 text-left text-[11px] font-medium text-gray-600">
                 <th className="pb-2">Competency</th>
@@ -65,7 +66,7 @@ const CompetencyCard: React.FC<CompetencyCardProps> = ({
                 );
                 return (
                   <tr key={competency.competencyId} className="border-b border-gray-100 last:border-0">
-                    <td className="py-2.5 pr-3">
+                    <td className="min-w-0 py-2.5 pr-3">
                       <p className="truncate text-sm text-black" title={competency.competencyName}>
                         {competency.competencyName}
                       </p>

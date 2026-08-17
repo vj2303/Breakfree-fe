@@ -8,6 +8,8 @@ import {
 } from '../lib/rubric';
 
 export interface ScoreLevelPickerProps {
+  /** Unique per sub-competency so the radio group does not bleed across rows. */
+  name: string;
   scoreDescriptions: Record<string, string>;
   currentScore: number;
   selectedScoreKey?: string;
@@ -17,6 +19,7 @@ export interface ScoreLevelPickerProps {
 }
 
 export default function ScoreLevelPicker({
+  name,
   scoreDescriptions,
   currentScore,
   selectedScoreKey,
@@ -51,7 +54,7 @@ export default function ScoreLevelPicker({
   }
 
   // Resolve the highlighted level the same way the previous picker did, so stored ticks and
-  // legacy 0–10 values keep resolving to the same circle.
+  // legacy 0–10 values keep resolving to the same option.
   const highlightKey =
     selectedScoreKey && scoreKeys.includes(selectedScoreKey)
       ? selectedScoreKey
@@ -60,72 +63,37 @@ export default function ScoreLevelPicker({
           return level >= 1 ? scoreKeys[level - 1] : undefined;
         })();
   const labels = getLevelLabels(scoreKeys.length);
-  const highlightIndex = highlightKey ? scoreKeys.indexOf(highlightKey) : -1;
-  const highlightLabel = labels && highlightIndex >= 0 ? labels[highlightIndex] : null;
 
   return (
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:gap-4">
-      <div className="flex flex-wrap gap-3 lg:flex-1">
-        {scoreKeys.map((key, index) => {
-          const level = parseScoreKeyLevel(key);
-          const isSelected = highlightKey === key;
-          const label = labels ? labels[index] : null;
-          return (
-            <div key={key} className="flex w-[104px] flex-col items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => onSelectLevel(level, key)}
-                disabled={disabled}
-                aria-pressed={isSelected}
-                aria-label={`Score ${level}${label ? `: ${label}` : ''}`}
-                className={`flex h-12 w-12 items-center justify-center rounded-full border text-sm font-semibold transition-colors ${
-                  isSelected
-                    ? 'border-violet-600 bg-violet-600 text-white'
-                    : 'border-gray-300 bg-white text-gray-700 hover:border-violet-400'
-                } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
-              >
-                {level}
-              </button>
-              {label && (
-                <span className="text-center text-[11px] leading-tight text-gray-500">{label}</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
+    <div className="space-y-1.5">
+      {scoreKeys.map((key, index) => {
+        const level = parseScoreKeyLevel(key);
+        const isSelected = highlightKey === key;
+        const label = labels ? labels[index] : null;
 
-      <div className="lg:w-80 lg:flex-shrink-0">
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-          {highlightKey ? (
-            <>
-              <p className="mb-1 text-xs font-semibold text-black">
-                Descriptor for Score {parseScoreKeyLevel(highlightKey)}
-                {highlightLabel ? ` – ${highlightLabel}` : ''}
-              </p>
-              <p className="text-xs leading-relaxed text-gray-700">
-                {scoreDescriptions[highlightKey] || 'No description'}
-              </p>
-            </>
-          ) : (
-            <p className="text-xs text-gray-500">Select a score to see its descriptor.</p>
-          )}
-        </div>
-        <details className="mt-2">
-          <summary className="cursor-pointer text-xs font-medium text-violet-600 hover:text-violet-700">
-            View descriptors for all scores
-          </summary>
-          <div className="mt-2 space-y-2">
-            {scoreKeys.map((key) => (
-              <p key={key} className="text-xs leading-relaxed text-gray-700">
-                <span className="font-medium text-gray-900">
-                  Score {parseScoreKeyLevel(key)}:{' '}
-                </span>
-                {scoreDescriptions[key] || 'No description'}
-              </p>
-            ))}
-          </div>
-        </details>
-      </div>
+        return (
+          <label
+            key={key}
+            className={`flex cursor-pointer items-start gap-2.5 rounded-lg px-2 py-1.5 transition-colors ${
+              isSelected ? 'bg-violet-50' : 'hover:bg-gray-50'
+            } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+          >
+            <input
+              type="radio"
+              name={name}
+              checked={isSelected}
+              disabled={disabled}
+              onChange={() => onSelectLevel(level, key)}
+              className="mt-0.5 h-4 w-4 flex-shrink-0 accent-violet-600"
+            />
+            <span className="min-w-0 text-xs leading-relaxed text-gray-800">
+              <span className="font-semibold text-gray-900">{level}.</span>{' '}
+              {scoreDescriptions[key] || 'No description'}
+              {label && <span className="ml-1 text-[11px] text-gray-400">({label})</span>}
+            </span>
+          </label>
+        );
+      })}
     </div>
   );
 }

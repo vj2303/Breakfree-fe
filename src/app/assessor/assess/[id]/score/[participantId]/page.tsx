@@ -9,14 +9,24 @@ import { downloadParticipantReportPdf } from '@/lib/reports/participantReportPdf
 import {
   NUMERIC_SCORE_COMMENT_KEY,
   averageSubCompetencyScores,
-  formatCompetencyAverage,
   deriveProgressStatus,
   getActivityProgress,
+  getCompetencyProgress,
+  getCompetencyScoreTotals,
   getSortedScoreKeysFromDescriptions,
+  getSubCompetencyScore,
   mergeActivitySubCompCommentsFromApi,
   mergeAssignmentSubCompCommentsFromApi,
   normalizeStoredToLevel,
+  sumScoreTotals,
+  toPercent,
 } from './lib/rubric';
+import {
+  createObservationId,
+  observationsForSubCompetency,
+  summarizeObservations,
+} from './lib/observations';
+import type { Observation, ObservationsByActivity } from './lib/observations';
 import type {
   AssessorScore,
   ActivityWithSubmissions,
@@ -24,19 +34,57 @@ import type {
   ParticipantDetails,
   SubmissionRecord,
 } from './lib/types';
-import type { ActivityRailItem } from './lib/types';
-import ActivityRail from './components/ActivityRail';
-import CompetencyRail from './components/CompetencyRail';
 import EvaluationResults from './components/EvaluationResults';
 import EvidencePanel from './components/EvidencePanel';
-import CompetencyScoreCard from './components/CompetencyScoreCard';
-import ParticipantOverview from './components/ParticipantOverview';
-import ScoringFooterBar from './components/ScoringFooterBar';
+import FinalSummaryModal from './components/FinalSummaryModal';
+import type { FinalSummaryRow } from './components/FinalSummaryModal';
+import ProgressSidebar from './components/ProgressSidebar';
+import type { ProgressCompetency } from './components/ProgressSidebar';
+import ScoringForm from './components/ScoringForm';
+import type { ReportDescriptorState } from './components/ScoringForm';
 import ScoringTopBar from './components/ScoringTopBar';
+import type { TopBarActivity } from './components/ScoringTopBar';
 
 
 interface ParticipantScoringProps {
   params: Promise<{ id: string; participantId: string }>;
+}
+
+const ACTIVITY_TYPE_LABELS: Record<string, string> = {
+  GD: 'Group Discussion',
+  GROUP_DISCUSSION: 'Group Discussion',
+  ROLEPLAY: 'Roleplay',
+  ROLE_PLAY: 'Roleplay',
+  CASE_STUDY: 'Case Study',
+  INBOX_ACTIVITY: 'Inbox Activity',
+  INTERVIEW: 'Interview',
+  PRESENTATION: 'Presentation',
+};
+
+/** "GROUP_DISCUSSION" -> "Group Discussion", for the activity picker subtitle. */
+function readableActivityType(activityType: string, interactiveActivityType?: string): string {
+  const raw = interactiveActivityType || activityType || '';
+  if (!raw) return 'Activity';
+  return (
+    ACTIVITY_TYPE_LABELS[raw] ??
+    raw
+      .replace(/_/g, ' ')
+      .toLowerCase()
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+  );
+}
+
+function readableSubmissionType(submissionType?: string): string {
+  switch (submissionType) {
+    case 'VIDEO':
+      return 'Video';
+    case 'DOCUMENT':
+      return 'Document';
+    case 'TEXT':
+      return 'Text';
+    default:
+      return 'Submission';
+  }
 }
 
 
@@ -83,9 +131,19 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
   // Scoring navigation — UI only, never persisted.
   const [activeCompetencyId, setActiveCompetencyId] = useState<string | null>(null);
   const [activeSubCompIndex, setActiveSubCompIndex] = useState(0);
-  const [competencyCardCollapsed, setCompetencyCardCollapsed] = useState(false);
   const [activeSubmissionId, setActiveSubmissionId] = useState<string | null>(null);
-  const [footerCollapsed, setFooterCollapsed] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [draftStatus, setDraftStatus] = useState<'DRAFT' | 'SUBMITTED' | null>(null);
+
+  /** Assessor observations against the evidence. Held in the UI only — never sent to the API. */
+  const [observations, setObservations] = useState<ObservationsByActivity>({});
+  /**
+   * Report descriptor overrides, keyed `activityId|competencyId|subCompetency`.
+   * UI only: with no override the text mirrors the selected rubric descriptor.
+   */
+  const [reportDescriptors, setReportDescriptors] = useState<
+    Record<string, { text: string; include: boolean; edited: boolean }>
+  >({});
 
   useEffect(() => {
     setActiveCompetencyId(null);
@@ -644,6 +702,75 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
     setActivitySubCompComment(activityId, competencyId, subComp, scoreKey, value);
   };
 
+  // ---------------------------------------------------------------------------
+  // Observations — client-side only, so nothing below touches the score payload.
+  // ---------------------------------------------------------------------------
+
+  const addObservation = (
+    activityId: string,
+    text: string,
+    timeSec: number | null,
+    mapping: { competencyId: string; subCompetency: string } | null
+  ) => {
+    const observation: Observation = {
+      id: createObservationId(),
+      activityId,
+      timeSec,
+      text,
+      competencyId: mapping?.competencyId ?? null,
+      subCompetency: mapping?.subCompetency ?? null,
+      createdAt: Date.now(),
+    };
+    setObservations((prev) => ({
+      ...prev,
+      [activityId]: [...(prev[activityId] || []), observation],
+    }));
+  };
+
+  const editObservation = (activityId: string, observationId: string, text: string) => {
+    setObservations((prev) => ({
+      ...prev,
+      [activityId]: (prev[activityId] || []).map((o) =>
+        o.id === observationId ? { ...o, text } : o
+      ),
+    }));
+  };
+
+  const deleteObservation = (activityId: string, observationId: string) => {
+    setObservations((prev) => ({
+      ...prev,
+      [activityId]: (prev[activityId] || []).filter((o) => o.id !== observationId),
+    }));
+  };
+
+  const mapObservation = (
+    activityId: string,
+    observationId: string,
+    mapping: { competencyId: string; subCompetency: string }
+  ) => {
+    setObservations((prev) => ({
+      ...prev,
+      [activityId]: (prev[activityId] || []).map((o) =>
+        o.id === observationId
+          ? { ...o, competencyId: mapping.competencyId, subCompetency: mapping.subCompetency }
+          : o
+      ),
+    }));
+  };
+
+  const reportDescriptorKey = (activityId: string, competencyId: string, subComp: string) =>
+    `${activityId}|${competencyId}|${subComp}`;
+
+  const setReportDescriptor = (
+    key: string,
+    patch: Partial<{ text: string; include: boolean; edited: boolean }>
+  ) => {
+    setReportDescriptors((prev) => {
+      const current = prev[key] ?? { text: '', include: true, edited: false };
+      return { ...prev, [key]: { ...current, ...patch } };
+    });
+  };
+
   const submitScores = async (assignmentId: string, status: 'DRAFT' | 'SUBMITTED') => {
     if (!participantDetails?.data || !assessorId || !token) {
       setError('Missing required data for score submission');
@@ -651,6 +778,7 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
     }
 
     setIsSubmittingScore(true);
+    setDraftStatus(status);
     setError(null);
 
     try {
@@ -739,6 +867,7 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
       setError(err instanceof Error ? err.message : 'An error occurred while submitting scores');
     } finally {
       setIsSubmittingScore(false);
+      setDraftStatus(null);
     }
   };
 
@@ -932,7 +1061,8 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    // Fills the assessor shell's padded main area so each column scrolls on its own.
+    <div className="-m-6 flex h-screen flex-col overflow-hidden bg-gray-50">
       <div className="flex min-h-0 flex-1 flex-col">
         {/* Only show assignment selector if assessmentCenterId not provided and multiple assignments exist */}
         {!assessmentCenterId && participantDetails.data.assignments.length > 1 && (
@@ -991,7 +1121,7 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
           const activeCompetency = activityCompetencies[activeCompetencyIndex] ?? null;
 
           // Sorted copy — the state array must not be mutated during render.
-          const activityItems: ActivityRailItem[] = [...selectedAssignment.activities]
+          const activityOptions: TopBarActivity[] = [...selectedAssignment.activities]
             .sort((a, b) => a.displayOrder - b.displayOrder)
             .map((activity) => {
               const competencies = getCompetenciesForActivity(
@@ -1006,13 +1136,11 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
               );
               return {
                 activityId: activity.activityId,
-                title: activity.displayName || activity.activityDetail.name,
-                subtitle: activity.activityDetail.name,
-                activityType: activity.activityType,
-                interactiveActivityType: activity.activityDetail.interactiveActivityType,
-                scoredCompetencies: scored,
-                totalCompetencies: total,
-                status: deriveProgressStatus(scored, total),
+                label: activity.displayName || activity.activityDetail.name,
+                sublabel: `${readableActivityType(
+                  activity.activityType,
+                  activity.activityDetail.interactiveActivityType
+                )} · ${scored}/${total} competencies scored`,
               };
             });
 
@@ -1063,34 +1191,119 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
               ? 'Next Sub-Competency'
               : 'Next Competency';
 
-          // Use stored competencyAverages if available, otherwise calculate on the fly
-          const competencyAveragesList: Array<{ id: string; name: string; average: number | null }> = [];
-          console.log('Displaying competency averages for assignment:', selectedAssignmentId);
-          console.log('Current competencyAverages state:', competencyAverages);
-          console.log('Current activityCompetencyScores:', activityCompetencyScores);
+          // ---- Scoring form + right rail figures (all derived from existing state) ----
+          const activityId = selectedActivity?.activityId ?? '';
+          const selectedKeysForActivity = selectedActivity
+            ? activitySelectedScoreKeys[activityId]
+            : undefined;
+          const scoresForActivity = selectedActivity
+            ? activityCompetencyScores[activityId]
+            : undefined;
 
+          const descriptionsFor = (competencyId: string) => (subComp: string) =>
+            selectedActivity ? getScoreDescriptions(activityId, competencyId, subComp) : {};
+
+          const competencyTotals = activityCompetencies.map((competency) => ({
+            competency,
+            totals: getCompetencyScoreTotals(
+              competency,
+              descriptionsFor(competency.id),
+              selectedKeysForActivity?.[competency.id],
+              scoresForActivity?.[competency.id]
+            ),
+          }));
+          const overallTotals = sumScoreTotals(competencyTotals.map((c) => c.totals));
+          const overallScore = toPercent(overallTotals.value, overallTotals.max);
+          const subCompetencyProgress =
+            overallTotals.total > 0 ? (overallTotals.scored / overallTotals.total) * 100 : 0;
+
+          const progressCompetencies: ProgressCompetency[] = competencyTotals.map(
+            ({ competency, totals }) => ({
+              id: competency.id,
+              name: competency.competencyName.split('\t')[0] || competency.competencyName,
+              value: totals.value,
+              max: totals.max,
+            })
+          );
+
+          // ---- Observations (UI-only state) ----
+          const activityObservations = selectedActivity ? observations[activityId] || [] : [];
+          const observationSummary = summarizeObservations(activityObservations);
+          const activeSubCompetency =
+            activeCompetency?.subCompetencyNames[activeSubCompIndex] ?? null;
+          const activeMapping =
+            activeCompetency && activeSubCompetency
+              ? { competencyId: activeCompetency.id, subCompetency: activeSubCompetency }
+              : null;
+          const activeMappingLabel = activeMapping
+            ? `${activeCompetencyIndex + 1}.${activeSubCompIndex + 1} ${
+                activeSubCompetency!.split('\t')[0] || activeSubCompetency
+              }`
+            : null;
+          const observationLabels = (observation: Observation) => {
+            if (!observation.competencyId || !observation.subCompetency) return null;
+            const competency = activityCompetencies.find((c) => c.id === observation.competencyId);
+            if (!competency) return null;
+            return {
+              competency: competency.competencyName.split('\t')[0] || competency.competencyName,
+              subCompetency:
+                observation.subCompetency.split('\t')[0] || observation.subCompetency,
+            };
+          };
+
+          // ---- Report descriptors (UI-only; defaults to the selected rubric descriptor) ----
+          const reportDescriptorFor = (subComp: string): ReportDescriptorState => {
+            if (!selectedActivity || !activeCompetency) {
+              return { text: '', include: true, edited: false };
+            }
+            const key = reportDescriptorKey(activityId, activeCompetency.id, subComp);
+            const stored = reportDescriptors[key];
+            const scoreKey = selectedKeysForActivity?.[activeCompetency.id]?.[subComp];
+            const generated = scoreKey
+              ? getScoreDescriptions(activityId, activeCompetency.id, subComp)[scoreKey] || ''
+              : '';
+            if (!stored) return { text: generated, include: true, edited: false };
+            return {
+              text: stored.edited ? stored.text : generated,
+              include: stored.include,
+              edited: stored.edited,
+            };
+          };
+
+          // ---- Evidence header details ----
+          const activeSubmission =
+            evidenceSubmissions.find((s) => s.id === activeSubmissionId) ?? evidenceSubmissions[0];
+          const submissionStamp = activeSubmission?.submittedAt || activeSubmission?.createdAt;
+          const submissionDate = submissionStamp ? new Date(submissionStamp) : null;
+          const submissionLabel = activeSubmission
+            ? `${readableSubmissionType(activeSubmission.submissionType)}${
+                evidenceSubmissions.length > 1 ? ` (${evidenceSubmissions.length})` : ''
+              }`
+            : 'Not submitted';
+          const submissionSubLabel = activeSubmission
+            ? submissionDate && !Number.isNaN(submissionDate.getTime())
+              ? `Submitted ${submissionDate.toLocaleString()}`
+              : activeSubmission.fileName || '—'
+            : 'Awaiting participant submission';
+
+          // ---- Final summary modal rows ----
           const storedAverages = competencyAverages[selectedAssignmentId] || {};
-
-          selectedAssignment.competencies.forEach(competency => {
-            // Use stored average if available
-            if (storedAverages[competency.id] !== undefined) {
-              competencyAveragesList.push({
-                id: competency.id,
-                name: competency.competencyName.split('\t')[0] || competency.competencyName,
-                average: storedAverages[competency.id]
-              });
-            } else {
-              // Fallback to calculation if not stored
-              let sum = 0;
-              let count = 0;
-              selectedAssignment.activities.forEach(activity => {
-                const assignedCompetencies = getCompetenciesForActivity(
+          const summaryRows: FinalSummaryRow[] = selectedAssignment.competencies.map(
+            (competency) => {
+              const [name, ...descriptionParts] = competency.competencyName.split('\t');
+              const carryingActivities = selectedAssignment.activities.filter((activity) =>
+                getCompetenciesForActivity(
                   activity.activityId,
                   activity.competency,
                   selectedAssignment.competencies
-                );
-                const isCompetencyAssigned = assignedCompetencies.some(c => c.id === competency.id);
-                if (isCompetencyAssigned) {
+                ).some((c) => c.id === competency.id)
+              );
+
+              let average: number | null = storedAverages[competency.id] ?? null;
+              if (average === null) {
+                let sum = 0;
+                let count = 0;
+                carryingActivities.forEach((activity) => {
                   const avg = averageSubCompetencyScores(
                     competency.subCompetencyNames,
                     activityCompetencyScores[activity.activityId]?.[competency.id]
@@ -1099,28 +1312,74 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
                     sum += avg;
                     count++;
                   }
-                }
+                });
+                average = count > 0 ? sum / count : null;
+              }
+
+              // Points available per sub-competency, so the bar scales to the rubric in use.
+              const maxes = competency.subCompetencyNames.map((subComp) => {
+                const rubricActivityId =
+                  getFirstActivityIdWithRubric(selectedAssignment, competency.id, subComp) ??
+                  carryingActivities[0]?.activityId;
+                const descriptions = rubricActivityId
+                  ? getScoreDescriptions(rubricActivityId, competency.id, subComp)
+                  : {};
+                return getSubCompetencyScore(descriptions, undefined, undefined).max;
               });
-              competencyAveragesList.push({
+              const max =
+                maxes.length > 0 ? maxes.reduce((a, b) => a + b, 0) / maxes.length : 0;
+
+              const complete =
+                carryingActivities.length > 0 &&
+                carryingActivities.every(
+                  (activity) =>
+                    getCompetencyProgress(
+                      competency,
+                      activitySelectedScoreKeys[activity.activityId],
+                      activityCompetencyScores[activity.activityId]
+                    ).complete
+                );
+
+              return {
                 id: competency.id,
-                name: competency.competencyName.split('\t')[0] || competency.competencyName,
-                average: count > 0 ? sum / count : null
-              });
+                name: name || competency.competencyName,
+                description: descriptionParts.join(' ').trim(),
+                complete,
+                activityCount: carryingActivities.length,
+                average,
+                max,
+              };
             }
-          });
-          console.log('Final competencyAveragesList for display:', competencyAveragesList);
+          );
 
           return (
         <div className="flex min-h-0 flex-1 flex-col">
                 <ScoringTopBar
+                  centerName={
+                    selectedAssignment.assessmentCenter.displayName ||
+                    selectedAssignment.assessmentCenter.name
+                  }
+                  assessorName={participantDetails.data.assessor?.name || ''}
                   participantName={participantDetails.data.participant.name}
                   participantId={participantDetails.data.participant.id}
+                  activities={activityOptions}
+                  selectedActivityId={selectedActivityId}
+                  onSelectActivity={setSelectedActivityId}
                   activityTitle={
                     selectedActivity
                       ? selectedActivity.displayName || selectedActivity.activityDetail.name
                       : ''
                   }
-                  activitySubtitle={selectedActivity?.activityDetail.description ?? ''}
+                  activityTypeLabel={
+                    selectedActivity
+                      ? `Type: ${readableActivityType(
+                          selectedActivity.activityType,
+                          selectedActivity.activityDetail.interactiveActivityType
+                        )}`
+                      : 'Select an activity'
+                  }
+                  submissionLabel={submissionLabel}
+                  submissionSubLabel={submissionSubLabel}
                   lifecycleStatus={lifecycleStatus}
                   progressStatus={deriveProgressStatus(
                     assignmentProgress.scored,
@@ -1132,8 +1391,10 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
                   editMode={editMode}
                   editReason={editReason}
                   onEditReasonChange={setEditReason}
-                  isSubmitting={isSubmittingScore}
+                  isSubmitting={isSubmittingScore && draftStatus === 'SUBMITTED'}
+                  isSavingDraft={isSubmittingScore && draftStatus === 'DRAFT'}
                   onBack={() => router.back()}
+                  onSaveDraft={() => submitScores(selectedAssignmentId, 'DRAFT')}
                   onSubmit={() => submitScores(selectedAssignmentId, 'SUBMITTED')}
                 />
 
@@ -1143,146 +1404,138 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
                   </div>
                 )}
 
-                <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
-                {competencyAveragesList.length > 0 && competencyAveragesList.some(c => c.average !== null) && (
-                  <div className="rounded-lg border border-gray-200 bg-gray-100 px-4 py-3">
-                    <h4 className="text-sm font-medium text-gray-800 mb-2">Competency Averages</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {competencyAveragesList.map(comp => (
-                        <div key={comp.id} className="flex items-center justify-between text-xs">
-                          <span className="text-gray-700">{comp.name}</span>
-                          <span className="font-semibold tabular-nums text-black">
-                            {formatCompetencyAverage(comp.average)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                {/* Evidence · Scoring form · Progress */}
+                <div className="scrollbar-thin flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 xl:flex-row xl:items-stretch xl:overflow-hidden">
+                  {/* Evidence + observations */}
+                  <div className="flex min-h-[420px] w-full flex-col xl:min-h-0 xl:w-[36%] xl:flex-shrink-0">
+                    {selectedActivity ? (
+                      <EvidencePanel
+                        activityLabel={
+                          selectedActivity.displayName || selectedActivity.activityDetail.name
+                        }
+                        activityType={selectedActivity.activityType}
+                        submissions={evidenceSubmissions}
+                        activeSubmissionId={activeSubmissionId}
+                        onSelectSubmission={setActiveSubmissionId}
+                        observations={activityObservations}
+                        disabled={isScoringDisabled}
+                        activeMappingLabel={activeMappingLabel}
+                        labelsFor={observationLabels}
+                        onAddObservation={(text, timeSec, mapToActive) =>
+                          addObservation(
+                            activityId,
+                            text,
+                            timeSec,
+                            mapToActive ? activeMapping : null
+                          )
+                        }
+                        onEditObservation={(id, text) => editObservation(activityId, id, text)}
+                        onDeleteObservation={(id) => deleteObservation(activityId, id)}
+                        onMapObservationToActive={(id) => {
+                          if (activeMapping) mapObservation(activityId, id, activeMapping);
+                        }}
+                      />
+                    ) : (
+                      <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+                        Select an activity to review its evidence.
+                      </div>
+                    )}
                   </div>
-                )}
-        <div className="flex min-h-0 flex-1 flex-col gap-4 xl:flex-row xl:items-stretch xl:gap-4">
-          {/* Activities + participant */}
-          <div className="scrollbar-thin flex min-h-0 w-full flex-col gap-4 overflow-y-auto xl:w-72 xl:flex-shrink-0">
-            <ActivityRail
-              items={activityItems}
-              selectedActivityId={selectedActivityId}
-              onSelectActivity={setSelectedActivityId}
-            />
-            <ParticipantOverview
-              name={participantDetails.data.participant.name}
-              participantId={participantDetails.data.participant.id}
-              program={
-                selectedAssignment.assessmentCenter.displayName ||
-                selectedAssignment.assessmentCenter.name
-              }
-              totalCompetencies={selectedAssignment.competencies.length}
-              activityCount={selectedAssignment.activities.length}
-              isGenerating={isGenerating}
-              isEvaluating={isEvaluating}
-              onGenerateReport={generateReport}
-              onEvaluate={evaluateInterview}
-            />
-          </div>
 
-          {/* Competency Section */}
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
-                {/* Evidence for the selected activity */}
-                {selectedActivity && (
-                  <div className="mb-4">
-                    <EvidencePanel
-                      activityLabel={selectedActivity.displayName || selectedActivity.activityDetail.name}
-                      activityType={selectedActivity.activityType}
-                      submissions={evidenceSubmissions}
-                      activeSubmissionId={activeSubmissionId}
-                      onSelectSubmission={setActiveSubmissionId}
+                  {/* Scoring form */}
+                  <div className="flex min-h-[420px] min-w-0 flex-1 flex-col xl:min-h-0">
+                    {activeCompetency && selectedActivity ? (
+                      <ScoringForm
+                        competency={activeCompetency}
+                        competencyIndex={activeCompetencyIndex}
+                        competencyCount={activityCompetencies.length}
+                        activeSubCompIndex={activeSubCompIndex}
+                        onActiveSubCompChange={setActiveSubCompIndex}
+                        scoreDescriptionsFor={descriptionsFor(activeCompetency.id)}
+                        scores={scoresForActivity?.[activeCompetency.id]}
+                        selectedKeys={selectedKeysForActivity?.[activeCompetency.id]}
+                        notes={activitySubCompComments[activityId]?.[activeCompetency.id]}
+                        disabled={isScoringDisabled}
+                        observationsFor={(sub) =>
+                          observationsForSubCompetency(
+                            activityObservations,
+                            activeCompetency.id,
+                            sub
+                          )
+                        }
+                        reportDescriptorFor={reportDescriptorFor}
+                        onReportDescriptorChange={(sub, text) =>
+                          setReportDescriptor(
+                            reportDescriptorKey(activityId, activeCompetency.id, sub),
+                            { text, edited: true }
+                          )
+                        }
+                        onReportDescriptorReset={(sub) =>
+                          setReportDescriptor(
+                            reportDescriptorKey(activityId, activeCompetency.id, sub),
+                            { text: '', edited: false }
+                          )
+                        }
+                        onReportDescriptorIncludeChange={(sub, include) =>
+                          setReportDescriptor(
+                            reportDescriptorKey(activityId, activeCompetency.id, sub),
+                            { include }
+                          )
+                        }
+                        onSelectLevel={(sub, level, scoreKey) =>
+                          handleSelectLevel(activityId, activeCompetency.id, sub, level, scoreKey)
+                        }
+                        onNumericChange={(sub, score) =>
+                          handleNumericChange(activityId, activeCompetency.id, sub, score)
+                        }
+                        onNoteChange={(sub, value) =>
+                          handleNoteChange(activityId, activeCompetency.id, sub, value)
+                        }
+                        onNext={advanceSubCompetency}
+                        nextLabel={nextSubCompetencyLabel}
+                        nextDisabled={isFinalSubCompetency}
+                      />
+                    ) : (
+                      <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+                        No competencies are configured for this activity.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Overall progress */}
+                  <div className="flex min-h-[360px] w-full flex-col xl:min-h-0 xl:w-72 xl:flex-shrink-0">
+                    <ProgressSidebar
+                      progressPercent={subCompetencyProgress}
+                      overallScore={overallScore}
+                      competencies={progressCompetencies}
+                      activeCompetencyId={activeCompetency?.id ?? null}
+                      onSelectCompetency={(id) => {
+                        setActiveCompetencyId(id);
+                        setActiveSubCompIndex(0);
+                      }}
+                      observationSummary={observationSummary}
+                      onViewFinalSummary={() => setSummaryOpen(true)}
+                      isGenerating={isGenerating}
+                      isEvaluating={isEvaluating}
+                      onGenerateReport={generateReport}
+                      onEvaluate={evaluateInterview}
                     />
                   </div>
-                )}
+                </div>
 
-                {/* Single-competency scoring, driven by the activity and competency rails */}
-                {activeCompetency ? (
-                  <CompetencyScoreCard
-                    competency={activeCompetency}
-                    competencyIndex={activeCompetencyIndex}
-                    competencyCount={activityCompetencies.length}
-                    activeSubCompIndex={activeSubCompIndex}
-                    onActiveSubCompChange={setActiveSubCompIndex}
-                    scoreDescriptionsFor={(sub) =>
-                      getScoreDescriptions(selectedActivity!.activityId, activeCompetency.id, sub)
-                    }
-                    scores={activityCompetencyScores[selectedActivity!.activityId]?.[activeCompetency.id]}
-                    selectedKeys={activitySelectedScoreKeys[selectedActivity!.activityId]?.[activeCompetency.id]}
-                    notes={activitySubCompComments[selectedActivity!.activityId]?.[activeCompetency.id]}
-                    disabled={isScoringDisabled}
-                    collapsed={competencyCardCollapsed}
-                    onToggleCollapsed={() => setCompetencyCardCollapsed((prev) => !prev)}
-                    onSelectLevel={(sub, level, scoreKey) =>
-                      handleSelectLevel(
-                        selectedActivity!.activityId,
-                        activeCompetency.id,
-                        sub,
-                        level,
-                        scoreKey
-                      )
-                    }
-                    onNumericChange={(sub, score) =>
-                      handleNumericChange(selectedActivity!.activityId, activeCompetency.id, sub, score)
-                    }
-                    onNoteChange={(sub, value) =>
-                      handleNoteChange(selectedActivity!.activityId, activeCompetency.id, sub, value)
-                    }
-                    onNext={advanceSubCompetency}
-                    nextLabel={nextSubCompetencyLabel}
-                    nextDisabled={isFinalSubCompetency}
-                  />
-                ) : (
-                  <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-                    No competencies are configured for this activity.
+                {evaluationData && (
+                  <div className="scrollbar-thin max-h-[40vh] flex-shrink-0 overflow-y-auto border-t border-gray-200 bg-gray-50 px-4 pb-4">
+                    <EvaluationResults data={evaluationData} />
                   </div>
                 )}
 
-                </div>
-          </div>
-          </div>
-
-          {/* Competencies in this activity */}
-          <div className="flex min-h-0 w-full flex-col xl:w-80 xl:flex-shrink-0">
-            <CompetencyRail
-              competencies={activityCompetencies}
-              activeCompetencyId={activeCompetency?.id ?? null}
-              activeSubCompIndex={activeSubCompIndex}
-              selectedKeys={
-                selectedActivity ? activitySelectedScoreKeys[selectedActivity.activityId] : undefined
-              }
-              scores={
-                selectedActivity ? activityCompetencyScores[selectedActivity.activityId] : undefined
-              }
-              onSelectCompetency={(id) => {
-                setActiveCompetencyId(id);
-                setActiveSubCompIndex(0);
-              }}
-              onSelectSubCompetency={(id, index) => {
-                setActiveCompetencyId(id);
-                setActiveSubCompIndex(index);
-              }}
-            />
-          </div>
-        </div>
-
-                <EvaluationResults data={evaluationData} />
-        </div>
-
-                <ScoringFooterBar
-                  activityTitle={
-                    selectedActivity
-                      ? selectedActivity.displayName || selectedActivity.activityDetail.name
-                      : ''
-                  }
-                  scoredCompetencies={assignmentProgress.scored}
-                  totalCompetencies={assignmentProgress.total}
-                  collapsed={footerCollapsed}
-                  onToggleCollapsed={() => setFooterCollapsed((prev) => !prev)}
+                <FinalSummaryModal
+                  open={summaryOpen}
+                  participantName={participantDetails.data.participant.name}
+                  rows={summaryRows}
+                  isGenerating={isGenerating}
+                  onClose={() => setSummaryOpen(false)}
+                  onGenerateReport={generateReport}
                 />
         </div>
           );
