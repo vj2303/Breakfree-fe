@@ -37,9 +37,9 @@ const GroupDetails: React.FC<GroupDetailsProps> = ({
   onBack,
 }) => {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+    <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
       {/* Header */}
-      <div className="border-b border-gray-200 px-4 py-3">
+      <div className="px-5 pb-3 pt-4">
         <button
           onClick={onBack}
           className="flex items-center text-black hover:text-gray-600 mb-2"
@@ -51,7 +51,7 @@ const GroupDetails: React.FC<GroupDetailsProps> = ({
       </div>
 
       {/* Search Bar */}
-      <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+      <div className="px-5 pb-4 flex items-center justify-between">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <input

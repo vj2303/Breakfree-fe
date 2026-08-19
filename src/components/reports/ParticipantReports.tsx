@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { ReportStructureApi, ReportStructure } from '@/lib/reportStructureApi';
-import { Download, Search, ArrowLeft, ChevronRight, LayoutDashboard, Sparkles, Upload } from 'lucide-react';
+import { Download, Search, ArrowLeft, FileText, Layers, LayoutDashboard, Sparkles, Upload, Users } from 'lucide-react';
 import { API_V1_BASE_URL } from '@/lib/apiConfig';
 import { downloadParticipantReportPdf } from '@/lib/reports/participantReportPdf';
 import ActionMenu from '@/components/ui/ActionMenu';
+import GroupsList from './GroupsList';
+import StatTile from './StatTile';
 import ParticipantOverview from './participantOverview/ParticipantOverview';
 import { initials } from './participantOverview/scoring';
 
@@ -487,8 +489,8 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
       />
 
       {/* Report Structure Selector */}
-      <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-        <div className="px-4 py-3 border-b border-gray-200">
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className="px-5 pb-4">
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <label className="block text-sm font-semibold text-black mb-2">
@@ -534,7 +536,7 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
                   >
                     <div className="font-medium text-sm text-black">{structure.reportName}</div>
                     {structure.description && (
-                      <div className="text-sm text-gray-600 mt-1">{structure.description}</div>
+                      <div className="mt-0.5 text-xs text-gray-600">{structure.description}</div>
                     )}
                   </button>
                 ))}
@@ -546,6 +548,23 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
             )}
           </div>
         )}
+      </div>
+
+      {/* Headline counts, from the groups and report structures already loaded */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatTile icon={Layers} label="Groups" value={groups.length} caption="Available to report on" />
+        <StatTile
+          icon={Users}
+          label="Participants"
+          value={groups.reduce((sum, group) => sum + (group.participants?.length || 0), 0)}
+          caption="Across all groups"
+        />
+        <StatTile
+          icon={FileText}
+          label="Report Structures"
+          value={reportStructures.length}
+          caption={selectedReportStructure ? `Using ${selectedReportStructure.reportName}` : 'None selected yet'}
+        />
       </div>
 
       {/* Error Message */}
@@ -596,46 +615,11 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
 
       {/* Groups List or Group Details */}
       {!selectedGroup ? (
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-          <div className="border-b border-gray-200 px-4 py-3">
-            <h3 className="text-base font-semibold text-black">Groups</h3>
-            <p className="text-sm text-gray-600 mt-1">Select a group to view participants</p>
-          </div>
-
-          <div className="p-4">
-            {groups.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {groups.map((group) => (
-                  <div
-                    key={group.id}
-                    onClick={() => setSelectedGroup(group)}
-                    className="border border-gray-200 rounded-lg p-4 hover:border-black hover:bg-gray-50 cursor-pointer transition-all"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="text-sm font-semibold text-black">{group.name}</h4>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {group.participants?.length || 0} participant{group.participants?.length !== 1 ? 's' : ''}
-                        </p>
-                      </div>
-                      <div className="text-black">
-                        <ChevronRight className="w-5 h-5" />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-6 text-sm text-gray-600">
-                No groups available
-              </div>
-            )}
-          </div>
-        </div>
+        <GroupsList groups={groups} onGroupSelect={setSelectedGroup} />
       ) : (
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
           {/* Header */}
-          <div className="border-b border-gray-200 px-4 py-3">
+          <div className="px-5 pb-3 pt-4">
             <button
               onClick={() => {
                 setSelectedGroup(null);
@@ -647,11 +631,11 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
               <span className="text-sm font-medium">Back to Groups</span>
             </button>
             <h3 className="text-base font-semibold text-black">{selectedGroup.name}</h3>
-            <p className="text-sm text-gray-600 mt-1">Select a participant to download their report</p>
+            <p className="mt-0.5 text-xs text-gray-600">Select a participant to download their report</p>
           </div>
 
           {/* Search Bar + scored-only filter */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-3 pt-4">
             <div className="relative w-full max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input

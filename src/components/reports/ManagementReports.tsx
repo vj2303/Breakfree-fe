@@ -570,10 +570,10 @@ const ManagementReports: React.FC<ManagementReportsProps> = ({ token }) => {
       {/* Assessment Details Section - Replaces top cards when participant and assessment center are selected */}
       {filteredParticipant && participantAssignments.length > 0 && (uniqueAssessmentCenters.length === 1 || selectedAssessmentCenter) ? (
         <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div className="border-b border-gray-200 px-4 py-3">
-            <h3 className="text-base font-bold text-black">Assessment Details</h3>
+          <div className="px-5 pb-3 pt-4">
+            <h3 className="text-base font-semibold text-black">Assessment Details</h3>
             {filteredParticipant && (
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="mt-0.5 text-xs text-gray-600">
                 {filteredParticipant.email}
               </p>
             )}
@@ -785,8 +785,8 @@ const ManagementReports: React.FC<ManagementReportsProps> = ({ token }) => {
       {filteredParticipant && showGraphs && (selectedAssessmentCenter || uniqueAssessmentCenters.length <= 1) && (
         <div className="space-y-4">
           <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="border-b border-gray-200 px-4 py-3">
-              <h3 className="text-base font-bold text-black">Performance Analytics</h3>
+            <div className="px-5 pb-3 pt-4">
+              <h3 className="text-base font-semibold text-black">Performance Analytics</h3>
             </div>
             
             {/* Application Average vs Readiness Graph */}
@@ -815,9 +815,9 @@ const ManagementReports: React.FC<ManagementReportsProps> = ({ token }) => {
       {/* All Assessors Reports Section - Show when participant and assessment center are selected */}
       {filteredParticipant && (selectedAssessmentCenter || uniqueAssessmentCenters.length === 1) && (
         <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div className="border-b border-gray-200 px-4 py-3">
-            <h3 className="text-base font-bold text-black">All Assessors Reports</h3>
-            <p className="text-sm text-gray-600 mt-1">
+          <div className="px-5 pb-3 pt-4">
+            <h3 className="text-base font-semibold text-black">All Assessors Reports</h3>
+            <p className="mt-0.5 text-xs text-gray-600">
               View all assessor evaluations with activity-wise competency scores
             </p>
           </div>
@@ -852,7 +852,7 @@ const ManagementReports: React.FC<ManagementReportsProps> = ({ token }) => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
           </svg>
           <p className="text-sm font-medium text-black">Select an Assessment Center</p>
-          <p className="text-sm text-gray-600 mt-1">This participant is assigned to multiple assessment centers. Please select one from the filter above to view assessment details.</p>
+          <p className="mt-0.5 text-xs text-gray-600">This participant is assigned to multiple assessment centers. Please select one from the filter above to view assessment details.</p>
         </div>
       )}
 
@@ -863,7 +863,7 @@ const ManagementReports: React.FC<ManagementReportsProps> = ({ token }) => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
           </svg>
           <p className="text-sm font-medium text-black">Select a participant to view performance analytics</p>
-          <p className="text-sm text-gray-600 mt-1">Choose a participant from the filter above to see detailed graphs and reports</p>
+          <p className="mt-0.5 text-xs text-gray-600">Choose a participant from the filter above to see detailed graphs and reports</p>
         </div>
       )}
     </div>
