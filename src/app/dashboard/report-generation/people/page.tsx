@@ -76,6 +76,30 @@ const PeopleManagement = () => {
     }
   }, []);
 
+  // Members who have finished every activity assigned to them, per group.
+  const [progressByGroup, setProgressByGroup] = useState<Map<string, { done: number; total: number }>>(
+    new Map()
+  );
+  const [progressLoading, setProgressLoading] = useState(false);
+
+  /** Runs `task` over `items` a few at a time so a large cohort cannot flood the API. */
+  const mapWithConcurrency = async <T, R>(
+    items: T[],
+    limit: number,
+    task: (item: T) => Promise<R>
+  ): Promise<R[]> => {
+    const results: R[] = new Array(items.length);
+    let cursor = 0;
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (cursor < items.length) {
+        const index = cursor++;
+        results[index] = await task(items[index]);
+      }
+    });
+    await Promise.all(workers);
+    return results;
+  };
+
   // Fetch participants from API
   const fetchParticipants = useCallback(async () => {
     setParticipantsLoading(true);
@@ -110,6 +134,67 @@ const PeopleManagement = () => {
     fetchGroups();
     fetchParticipants();
   }, [fetchGroups, fetchParticipants]);
+
+  // Group progress: one assignments lookup per distinct member, reused across groups.
+  useEffect(() => {
+    if (groups.length === 0) return;
+    let cancelled = false;
+
+    const loadProgress = async () => {
+      const token = getAuthToken();
+      if (!token) return;
+
+      const memberIds = Array.from(
+        new Set(
+          groups.flatMap(
+            (group) =>
+              group.members || group.participantIds || group.participants?.map((p) => p.id) || []
+          )
+        )
+      );
+      if (memberIds.length === 0) return;
+
+      setProgressLoading(true);
+      try {
+        const entries = await mapWithConcurrency(memberIds, 4, async (participantId) => {
+          try {
+            const res = await fetch(
+              `${API_BASE_URL_WITH_API}/assignments/participant/${participantId}`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            const json = res.ok ? await res.json() : null;
+            const assignments: any[] = json?.data?.assignments || [];
+            const activities = assignments.flatMap((a: any) => a.activities || []);
+            const done =
+              activities.length > 0 && activities.every((a: any) => Boolean(a.isSubmitted));
+            return [participantId, done] as const;
+          } catch {
+            return [participantId, false] as const;
+          }
+        });
+
+        if (cancelled) return;
+        const doneById = new Map(entries);
+        const next = new Map<string, { done: number; total: number }>();
+        groups.forEach((group) => {
+          const ids =
+            group.members || group.participantIds || group.participants?.map((p) => p.id) || [];
+          next.set(group.id, {
+            done: ids.filter((id) => doneById.get(id)).length,
+            total: ids.length,
+          });
+        });
+        setProgressByGroup(next);
+      } finally {
+        if (!cancelled) setProgressLoading(false);
+      }
+    };
+
+    loadProgress();
+    return () => {
+      cancelled = true;
+    };
+  }, [groups]);
 
   // Handlers for Participants
   const handleAddParticipant = async (newParticipant: Omit<Participant, 'id'>) => {
@@ -253,60 +338,86 @@ const PeopleManagement = () => {
   // Note: handleEditGroupMembers will be implemented when needed
   // Note: User handlers will be implemented when UsersComponent requires them
 
+  const TAB_COPY: Record<typeof tab, string> = {
+    groups: "Manage the assessment groups you run and who's admin for each",
+    participants: 'Add, edit and organise the people being assessed',
+    assessors: 'Manage the assessors who score submissions',
+  };
+
+  const TABS: Array<{ id: typeof tab; label: string }> = [
+    { id: 'groups', label: 'Groups' },
+    { id: 'participants', label: 'Participants' },
+    { id: 'assessors', label: 'Assessors' },
+  ];
+
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <h1 className="text-2xl font-bold mb-1 text-black">People Management</h1>
-      <p className="text-black mb-4">Manage your groups and participants efficiently</p>
-      
-      <div className="flex gap-2 mb-6">
-        <button
-          className={`px-6 py-2 rounded-full transition-colors ${tab === 'groups' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black hover:bg-gray-200'}`}
-          onClick={() => setTab('groups')}
-        >
-          Groups
-        </button>
-        <button
-          className={`px-6 py-2 rounded-full transition-colors ${tab === 'participants' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black hover:bg-gray-200'}`}
-          onClick={() => setTab('participants')}
-        >
-          Participants
-        </button>
-        <button
-          className={`px-6 py-2 rounded-full transition-colors ${tab === 'assessors' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black hover:bg-gray-200'}`}
-          onClick={() => setTab('assessors')}
-        >
-          Assessors
-        </button>
+    <div className="min-h-screen bg-[#f8fafd] p-6">
+      <h1 className="text-3xl font-bold text-black">People Management</h1>
+      <p className="mt-1 text-sm text-gray-500">{TAB_COPY[tab]}</p>
+
+      <div className="mt-5 flex flex-wrap gap-3">
+        {TABS.map((item) => {
+          const isActive = tab === item.id;
+          return (
+            <button
+              key={item.id}
+              className={`rounded-lg px-6 py-2.5 text-sm font-semibold transition-colors ${
+                isActive
+                  ? 'bg-gray-900 text-white'
+                  : 'border border-gray-200 bg-white text-black hover:bg-gray-50'
+              }`}
+              onClick={() => setTab(item.id)}
+            >
+              {item.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Keep all tabs mounted to avoid re-fetching on toggle */}
-      <div className={tab === 'groups' ? '' : 'hidden'}>
+      <div className={tab === 'groups' ? 'mt-6' : 'hidden'}>
         {groupsLoading ? (
-          <div className="text-gray-500">Loading groups...</div>
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+            {[0, 1].map((row) => (
+              <div key={row} className="rounded-2xl border border-gray-200 bg-white p-5">
+                <div className="h-5 w-2/3 animate-pulse rounded bg-gray-200" />
+                <div className="mt-3 h-4 w-1/2 animate-pulse rounded bg-gray-100" />
+                <div className="mt-5 h-2 w-full animate-pulse rounded-full bg-gray-200" />
+                <div className="mt-6 flex gap-3">
+                  <div className="h-10 flex-1 animate-pulse rounded-lg bg-gray-100" />
+                  <div className="h-10 flex-1 animate-pulse rounded-lg bg-gray-100" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : groupsError ? (
-          <div className="text-red-500">{groupsError}</div>
-        ) : participantsLoading ? (
-          <div className="text-gray-500">Loading participants...</div>
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {groupsError}
+          </div>
         ) : participantsError ? (
-          <div className="text-red-500">{participantsError}</div>
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {participantsError}
+          </div>
         ) : (
           <GroupsComponent
             groups={groups}
             participants={participants}
+            progressByGroup={progressByGroup}
+            progressLoading={progressLoading}
             onAddGroup={handleAddGroup}
             onEditGroup={handleEditGroup}
             onRemoveGroup={handleRemoveGroup}
           />
         )}
       </div>
-      <div className={tab === 'participants' ? '' : 'hidden'}>
+      <div className={tab === 'participants' ? 'mt-6' : 'hidden'}>
         <ParticipantsComponent
           onAddParticipant={handleAddParticipant}
           onEditParticipant={handleEditParticipant}
           onRemoveParticipant={handleRemoveParticipant}
         />
       </div>
-      <div className={tab === 'assessors' ? '' : 'hidden'}>
+      <div className={tab === 'assessors' ? 'mt-6' : 'hidden'}>
         <UsersComponent />
       </div>
     </div>

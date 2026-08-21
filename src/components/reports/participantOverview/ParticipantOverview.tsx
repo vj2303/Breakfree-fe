@@ -9,7 +9,12 @@ import AssessmentCompletionTable from './AssessmentCompletionTable';
 import AssessmentProgressCharts from './AssessmentProgressCharts';
 import ParticipantSummaryCard from './ParticipantSummaryCard';
 import ScoringDetailsPanel from './ScoringDetailsPanel';
-import { formatDateRange, parseCompetencyName, readableActivityType } from './scoring';
+import {
+  buildProgressPoints,
+  formatDateRange,
+  parseCompetencyName,
+  readableActivityType,
+} from './scoring';
 import type {
   AssessorRecord,
   CompletionRow,
@@ -48,52 +53,6 @@ function readDescription(detail: RawRecord | null | undefined): string {
   if (!detail) return '';
   const value = detail.description ?? detail.instructions ?? detail.summary;
   return typeof value === 'string' ? value : '';
-}
-
-/**
- * The three progress charts.
- *
- * `pre-post-assessment` supplies the application scores either side of the programme;
- * `application-readiness` supplies the readiness scores uploaded for the centre. The
- * deltas are computed here rather than read back, so the three charts always agree.
- */
-function buildProgressPoints(
-  competencies: OverviewCompetency[],
-  prePost: RawRecord[],
-  readiness: RawRecord[]
-): ProgressPoint[] {
-  const prePostById = new Map(prePost.map((row) => [row.competencyId, row]));
-  const readinessById = new Map(readiness.map((row) => [row.competencyId, row]));
-
-  const num = (value: unknown): number | null =>
-    typeof value === 'number' && Number.isFinite(value) ? value : null;
-
-  const delta = (post: number | null, pre: number | null): number | null =>
-    post === null || pre === null ? null : Number((post - pre).toFixed(2));
-
-  return competencies.map((competency) => {
-    const pp = prePostById.get(competency.id) || {};
-    const ar = readinessById.get(competency.id) || {};
-
-    const preApplication = num(pp.preAssessmentApp);
-    const postApplication = num(pp.preAssessmentApp2) ?? num(ar.applicationAverage);
-    const postReadiness = num(pp.postAssessmentReadiness) ?? num(ar.readiness);
-    const preReadiness =
-      postReadiness !== null && num(pp.improvement) !== null
-        ? Number((postReadiness - (num(pp.improvement) as number)).toFixed(2))
-        : num(ar.readiness);
-
-    return {
-      code: competency.code,
-      competencyName: competency.label,
-      preReadiness,
-      preApplication,
-      postReadiness,
-      postApplication,
-      readinessDelta: delta(postReadiness, preReadiness),
-      applicationDelta: delta(postApplication, preApplication),
-    };
-  });
 }
 
 export default function ParticipantOverview({

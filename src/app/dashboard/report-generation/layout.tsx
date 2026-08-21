@@ -16,7 +16,12 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Home', icon: Home, href: '/dashboard/report-generation/home' },
+  {
+    label: 'Home',
+    icon: Home,
+    href: '/dashboard/report-generation/home',
+    prefix: '/dashboard/report-generation/home',
+  },
   {
     label: 'Content',
     icon: FileText,

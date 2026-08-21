@@ -1,4 +1,4 @@
-import type { AssessorRecord, OverviewCompetency } from './types';
+import type { AssessorRecord, OverviewCompetency, ProgressPoint } from './types';
 
 /** Sub-competencies with no rubric descriptors are scored 0–10. */
 export const NUMERIC_SCORE_MAX = 10;
@@ -244,4 +244,51 @@ export function formatDateRange(dates: string[]): string {
     return `${first.getDate()} – ${last.getDate()} ${monthYear(first)}`;
   }
   return `${first.getDate()} ${monthYear(first)} – ${last.getDate()} ${monthYear(last)}`;
+}
+
+/**
+ * Maps one participant's `pre-post-assessment` and `application-readiness` rows onto the
+ * four series the progress charts draw, plus the two deltas.
+ *
+ * Shared by the participant overview and the cohort-level insights screen so both read the
+ * backend the same way — change the field pairing here and every chart follows.
+ */
+export function buildProgressPoints(
+  competencies: OverviewCompetency[],
+  prePost: Array<Record<string, unknown>>,
+  readiness: Array<Record<string, unknown>>
+): ProgressPoint[] {
+  const prePostById = new Map(prePost.map((row) => [row.competencyId as string, row]));
+  const readinessById = new Map(readiness.map((row) => [row.competencyId as string, row]));
+
+  const num = (value: unknown): number | null =>
+    typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+  const delta = (post: number | null, pre: number | null): number | null =>
+    post === null || pre === null ? null : Number((post - pre).toFixed(2));
+
+  return competencies.map((competency) => {
+    const pp = prePostById.get(competency.id) || {};
+    const ar = readinessById.get(competency.id) || {};
+
+    const preApplication = num(pp.preAssessmentApp);
+    const postApplication = num(pp.preAssessmentApp2) ?? num(ar.applicationAverage);
+    const postReadiness = num(pp.postAssessmentReadiness) ?? num(ar.readiness);
+    const improvement = num(pp.improvement);
+    const preReadiness =
+      postReadiness !== null && improvement !== null
+        ? Number((postReadiness - improvement).toFixed(2))
+        : num(ar.readiness);
+
+    return {
+      code: competency.code,
+      competencyName: competency.label,
+      preReadiness,
+      preApplication,
+      postReadiness,
+      postApplication,
+      readinessDelta: delta(postReadiness, preReadiness),
+      applicationDelta: delta(postApplication, preApplication),
+    };
+  });
 }
