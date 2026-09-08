@@ -109,3 +109,27 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* ============================================================
+   Assessor portal palette — scoped so it cannot leak into the
+   admin dashboard, which keeps its own violet/grey scheme.
+   ============================================================ */
+.assessor-portal {
+  --ap-navy: #16233f;
+  --ap-navy-soft: #2c3e63;
+  --ap-teal: #0f766e;
+  --ap-teal-wash: #e7f3f1;
+  --ap-rust: #b4491f;
+  --ap-rust-wash: #fbede5;
+  --ap-amber: #a9640b;
+  --ap-amber-wash: #fbf1df;
+  --ap-grey-wash: #f0efea;
+  --ap-grey: #6b7280;
+  --ap-grey-light: #9c9890;
+  --ap-grey-pale: #d9d5cb;
+  --ap-slate: #7c8aa0;
+  --ap-bg: #faf8f4;
+  --ap-card: #ffffff;
+  --ap-border: #e9e5dc;
+  --ap-ink: #17181c;
+}

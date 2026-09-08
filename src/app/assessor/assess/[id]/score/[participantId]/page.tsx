@@ -1061,8 +1061,8 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
   }
 
   return (
-    // Fills the assessor shell's padded main area so each column scrolls on its own.
-    <div className="-m-6 flex h-screen flex-col overflow-hidden bg-gray-50">
+    // Fills the assessor shell's full-bleed main area so each column scrolls on its own.
+    <div className="flex h-full min-h-[560px] flex-col overflow-hidden bg-gray-50">
       <div className="flex min-h-0 flex-1 flex-col">
         {/* Only show assignment selector if assessmentCenterId not provided and multiple assignments exist */}
         {!assessmentCenterId && participantDetails.data.assignments.length > 1 && (
