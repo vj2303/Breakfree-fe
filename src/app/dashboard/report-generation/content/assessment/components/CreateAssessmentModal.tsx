@@ -3,12 +3,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { InteractiveActivityType, AssessmentType } from '../types/assessment';
-
-const INTERACTIVE_ACTIVITY_TYPES: { value: InteractiveActivityType; label: string }[] = [
-  { value: 'GD', label: 'Group Discussion (GD)' },
-  { value: 'ROLEPLAY', label: 'Roleplay' },
-  { value: 'CASE_STUDY', label: 'Case Study' },
-];
+import { INTERACTION_ACTIVITY_TYPES } from '@/lib/activityTaxonomy';
 
 interface CreateAssessmentModalProps {
   isOpen: boolean;
@@ -30,11 +25,11 @@ const CreateAssessmentModal: React.FC<CreateAssessmentModalProps> = ({
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    interactiveActivityType: 'CASE_STUDY' as InteractiveActivityType,
+    interactiveActivityType: 'GD' as InteractiveActivityType,
   });
 
   const isInboxActivity = activeTab === 'inbox-activity';
-  const modalTitle = isInboxActivity ? 'Create Inbox Activity' : 'Create New Assessment';
+  const modalTitle = isInboxActivity ? 'Create Inbox Activity' : 'Create Interaction Activity';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +48,7 @@ const CreateAssessmentModal: React.FC<CreateAssessmentModalProps> = ({
     setFormData({
       name: '',
       description: '',
-      interactiveActivityType: 'CASE_STUDY',
+      interactiveActivityType: 'GD',
     });
     
     onClose();
@@ -64,7 +59,7 @@ const CreateAssessmentModal: React.FC<CreateAssessmentModalProps> = ({
     setFormData({
       name: '',
       description: '',
-      interactiveActivityType: 'CASE_STUDY',
+      interactiveActivityType: 'GD',
     });
     onClose();
   };
@@ -99,7 +94,7 @@ const CreateAssessmentModal: React.FC<CreateAssessmentModalProps> = ({
             />
           </div>
 
-          {/* Only show Activity Type selector for Interactive Activities, not for Inbox Activity */}
+          {/* Only show Activity Type selector for Interaction Activities, not for Inbox Activity */}
           {!isInboxActivity && (
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -111,7 +106,7 @@ const CreateAssessmentModal: React.FC<CreateAssessmentModalProps> = ({
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                 required
               >
-                {INTERACTIVE_ACTIVITY_TYPES.map((type) => (
+                {INTERACTION_ACTIVITY_TYPES.map((type) => (
                   <option key={type.value} value={type.value}>
                     {type.label}
                   </option>

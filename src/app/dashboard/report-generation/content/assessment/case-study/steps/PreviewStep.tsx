@@ -49,7 +49,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({ formData, scenarios, tasks })
           
           <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900 mb-3">
-              Interactive Activity - Participant Instructions
+              Interaction Activity - Participant Instructions
             </h2>
             
             {formData.overview ? (

@@ -4,18 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
-const getInteractiveActivityTypeBadge = (type?: string) => {
-  switch (type) {
-    case 'GD':
-      return { label: 'GD', color: 'bg-blue-50 text-blue-700 border-blue-200' };
-    case 'ROLEPLAY':
-      return { label: 'Roleplay', color: 'bg-purple-50 text-purple-700 border-purple-200' };
-    case 'CASE_STUDY':
-      return { label: 'Case Study', color: 'bg-green-50 text-green-700 border-green-200' };
-    default:
-      return null;
-  }
-};
+const getInteractiveActivityTypeBadge = (type?: string) => interactionTypeBadge(type);
 import { AssignmentSubmissionApi } from '@/lib/assignmentSubmissionApi';
 import { ActivityData } from './types';
 import OverviewStep from './OverviewStep';
@@ -23,6 +12,7 @@ import ScenarioStep from './ScenarioStep';
 import TaskStep from './TaskStep';
 import ReviewStep from './ReviewStep';
 import Timer from '@/components/Timer';
+import { interactionTypeBadge } from '@/lib/activityTaxonomy';
 
 const steps = [
   'Overview and Instructions',

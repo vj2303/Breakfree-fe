@@ -4,6 +4,7 @@ import { AIProfileApi } from '../../../../../lib/aiProfileApi'
 import { useAuth } from '../../../../../context/AuthContext'
 import { AIProfile } from '../ai-profile/types'
 import { ReportStructureApi, ReportFormData, ReportStructure } from '../../../../../lib/reportStructureApi'
+import { INTERACTION_ACTIVITY_TYPES } from '@/lib/activityTaxonomy'
 
 interface CreateReportFormProps {
   onCancel: () => void
@@ -19,10 +20,10 @@ const CreateReportForm: React.FC<CreateReportFormProps> = ({ onCancel, onSave, e
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   
-  // Assessment types available
-  const assessmentTypes = [
-    { value: 'CASE_STUDY', label: 'Case Study' },
-    { value: 'INBOX_ACTIVITY', label: 'Inbox Activity' }
+  // Two categories; interaction activities break down into their four types.
+  const assessmentTypeGroups: Array<{ label: string; options: { value: string; label: string }[] }> = [
+    { label: 'Inbox Activity', options: [{ value: 'INBOX_ACTIVITY', label: 'Inbox Activity' }] },
+    { label: 'Interaction Activities', options: INTERACTION_ACTIVITY_TYPES },
   ];
 
   const [formData, setFormData] = useState<ReportFormData>({
@@ -78,6 +79,17 @@ const CreateReportForm: React.FC<CreateReportFormProps> = ({ onCancel, onSave, e
         }
       }
       
+      // Reports saved before the split stored a single CASE_STUDY value meaning the whole
+      // interaction family. Expand it so the selection survives an edit instead of being
+      // silently dropped by the finer checkboxes.
+      if (selectedAssessment.includes('CASE_STUDY')) {
+        const expanded = INTERACTION_ACTIVITY_TYPES.map((type) => type.value as string);
+        selectedAssessment = [
+          ...selectedAssessment.filter((value) => value !== 'CASE_STUDY'),
+          ...expanded.filter((value) => !selectedAssessment.includes(value)),
+        ];
+      }
+
       setFormData({
         reportName: editingReport.reportName || '',
         description: editingReport.description || '',
@@ -367,36 +379,51 @@ const CreateReportForm: React.FC<CreateReportFormProps> = ({ onCancel, onSave, e
               Select Assessment Type(s)
             </label>
             <div className="border border-gray-200 rounded-lg p-2.5 min-h-[100px] max-h-[180px] overflow-y-auto">
-              {assessmentTypes.map((type) => {
-                const selectedAssessments = Array.isArray(formData.selectedAssessment) 
-                  ? formData.selectedAssessment 
-                  : formData.selectedAssessment ? [formData.selectedAssessment] : [];
-                const isChecked = selectedAssessments.includes(type.value);
-                
-                return (
-                  <label key={type.value} className="flex items-center mb-1.5 cursor-pointer hover:bg-gray-50 p-1.5 rounded">
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={(e) => {
-                        const current = Array.isArray(formData.selectedAssessment) 
-                          ? formData.selectedAssessment 
-                          : formData.selectedAssessment ? [formData.selectedAssessment] : [];
-                        
-                        let updated: string[];
-                        if (e.target.checked) {
-                          updated = [...current, type.value];
-                        } else {
-                          updated = current.filter((item: string) => item !== type.value);
-                        }
-                        handleInputChange('selectedAssessment', updated);
-                      }}
-                      className="mr-2.5 h-3.5 w-3.5 text-black focus:ring-black border-gray-300 rounded"
-                    />
-                    <span className="text-xs text-gray-700">{type.label}</span>
-                  </label>
-                );
-              })}
+              {assessmentTypeGroups.map((group) => (
+                <div key={group.label} className="mb-2 last:mb-0">
+                  {group.options.length > 1 && (
+                    <p className="mb-1 px-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                      {group.label}
+                    </p>
+                  )}
+                  {group.options.map((type) => {
+                    const selectedAssessments = Array.isArray(formData.selectedAssessment)
+                      ? formData.selectedAssessment
+                      : formData.selectedAssessment
+                        ? [formData.selectedAssessment]
+                        : [];
+                    const isChecked = selectedAssessments.includes(type.value);
+
+                    return (
+                      <label
+                        key={type.value}
+                        className={`flex items-center mb-1.5 cursor-pointer hover:bg-gray-50 p-1.5 rounded ${
+                          group.options.length > 1 ? 'ml-2' : ''
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            const current = Array.isArray(formData.selectedAssessment)
+                              ? formData.selectedAssessment
+                              : formData.selectedAssessment
+                                ? [formData.selectedAssessment]
+                                : [];
+
+                            const updated = e.target.checked
+                              ? [...current, type.value]
+                              : current.filter((item: string) => item !== type.value);
+                            handleInputChange('selectedAssessment', updated);
+                          }}
+                          className="mr-2.5 h-3.5 w-3.5 text-black focus:ring-black border-gray-300 rounded"
+                        />
+                        <span className="text-xs text-gray-700">{type.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
             {Array.isArray(formData.selectedAssessment) && formData.selectedAssessment.length > 0 && (
               <p className="mt-1.5 text-xs text-gray-500">

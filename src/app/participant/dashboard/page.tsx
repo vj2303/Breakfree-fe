@@ -2,19 +2,9 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { interactionTypeBadge } from '@/lib/activityTaxonomy';
 
-const getInteractiveActivityTypeBadge = (type?: string) => {
-  switch (type) {
-    case 'GD':
-      return { label: 'GD', color: 'bg-blue-50 text-blue-700 border-blue-200' };
-    case 'ROLEPLAY':
-      return { label: 'Roleplay', color: 'bg-purple-50 text-purple-700 border-purple-200' };
-    case 'CASE_STUDY':
-      return { label: 'Case Study', color: 'bg-green-50 text-green-700 border-green-200' };
-    default:
-      return null;
-  }
-};
+const getInteractiveActivityTypeBadge = (type?: string) => interactionTypeBadge(type);
 
 interface AssessmentCardProps {
   assignmentId: string;

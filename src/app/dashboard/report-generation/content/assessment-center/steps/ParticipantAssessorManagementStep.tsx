@@ -211,7 +211,7 @@ const ParticipantAssessorManagementStep: React.FC = () => {
         });
         setActivityTypeMap(map);
       } catch {
-        // Non-fatal — labels just fall back to "Interactive Activity"
+        // Non-fatal — labels just fall back to "Interaction Activity"
       }
     };
     buildMap();

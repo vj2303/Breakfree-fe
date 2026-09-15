@@ -1,5 +1,8 @@
 // types/assessment.ts
-export type InteractiveActivityType = 'GD' | 'ROLEPLAY' | 'CASE_STUDY';
+import type { InteractionActivityType } from '@/lib/activityTaxonomy';
+
+/** Interaction sub-types. Re-exported from the taxonomy so there is one list. */
+export type InteractiveActivityType = InteractionActivityType;
 
 export interface Assessment {
   id: string;

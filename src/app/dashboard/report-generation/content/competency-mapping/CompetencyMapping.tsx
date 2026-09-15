@@ -531,11 +531,15 @@ const CompetencyMapping: React.FC<CompetencyMappingProps> = () => {
                     })}
                   </p>
                   
-                  {/* Display competency libraries */}
+                  {/* Display the competencies in this map */}
                   {mapping.competencyLibraries.length > 0 && (
                     <div className="mt-3">
                       <p className="text-sm text-blue-600 font-medium mb-1">
-                        {mapping.competencyLibraries.length} Competency Libraries:
+                        {`${mapping.competencyLibraries.length} ${
+                          mapping.competencyLibraries.length === 1
+                            ? 'Competency'
+                            : 'Competencies'
+                        }:`}
                       </p>
                       <div className="space-y-2">
                         {mapping.competencyLibraries.slice(0, 2).map((library) => (
@@ -548,7 +552,7 @@ const CompetencyMapping: React.FC<CompetencyMappingProps> = () => {
                         ))}
                         {mapping.competencyLibraries.length > 2 && (
                           <p className="text-xs text-gray-500">
-                            +{mapping.competencyLibraries.length - 2} more libraries
+                            +{mapping.competencyLibraries.length - 2} more
                           </p>
                         )}
                       </div>

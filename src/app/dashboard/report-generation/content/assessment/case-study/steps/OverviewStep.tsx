@@ -3,13 +3,16 @@
 import React from 'react';
 import Editor from '@/components/Editor';
 
-type InteractiveActivityType = 'GD' | 'ROLEPLAY' | 'CASE_STUDY';
+import {
+  INTERACTION_ACTIVITY_TYPES_WITH_LEGACY,
+  type InteractionActivityType,
+} from '@/lib/activityTaxonomy';
 
-const INTERACTIVE_ACTIVITY_TYPES: { value: InteractiveActivityType; label: string }[] = [
-  { value: 'GD', label: 'Group Discussion (GD)' },
-  { value: 'ROLEPLAY', label: 'Roleplay' },
-  { value: 'CASE_STUDY', label: 'Case Study' },
-];
+type InteractiveActivityType = InteractionActivityType;
+
+// Includes the legacy entry so editing an older activity does not silently
+// reset its type when the form loads.
+const INTERACTIVE_ACTIVITY_TYPES = INTERACTION_ACTIVITY_TYPES_WITH_LEGACY;
 
 interface OverviewStepProps {
   formData: {

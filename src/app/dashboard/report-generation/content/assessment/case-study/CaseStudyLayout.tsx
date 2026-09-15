@@ -58,14 +58,14 @@ const CaseStudyLayout: React.FC<CaseStudyLayoutProps> = ({
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-black flex items-center gap-2">
-              Interactive Activity
+              Interaction Activity
               <span className="text-gray-400">✏️</span>
             </h1>
             <p className="text-sm text-black mt-1">Created on 2 Jan 2025</p>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 relative">
-              <span className="text-sm text-black">Know More about Interactive Activity</span>
+              <span className="text-sm text-black">Know More about Interaction Activity</span>
               <button
                 onClick={() => setShowInfoTooltip(!showInfoTooltip)}
                 className="w-5 h-5 bg-gray-900 rounded-full flex items-center justify-center cursor-pointer hover:bg-gray-700 transition-colors"

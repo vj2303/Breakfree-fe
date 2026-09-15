@@ -3,31 +3,23 @@ import { Trash2 } from "lucide-react";
 import { useAssessmentForm } from '../create/context';
 import { useAuth } from '@/context/AuthContext';
 import { API_BASE_URL_WITH_API } from '../../../../../../lib/apiConfig';
+import {
+  ACTIVITY_CATEGORIES,
+  INTERACTION_ACTIVITY_TYPES_WITH_LEGACY,
+  interactionTypeBadge,
+} from '@/lib/activityTaxonomy';
 
-const activityTypes = [
-  { value: "case-study", label: "Interactive Activity" },
-  { value: "inbox-activity", label: "Inbox Activity" },
-];
+const activityTypes = ACTIVITY_CATEGORIES.map((category) => ({
+  value: category.value as string,
+  label: category.label,
+}));
 
 const interactiveActivityTypeFilters = [
   { value: "", label: "All Types" },
-  { value: "GD", label: "Group Discussion (GD)" },
-  { value: "ROLEPLAY", label: "Roleplay" },
-  { value: "CASE_STUDY", label: "Case Study" },
+  ...INTERACTION_ACTIVITY_TYPES_WITH_LEGACY,
 ];
 
-const getInteractiveActivityTypeLabel = (type?: string) => {
-  switch (type) {
-    case 'GD':
-      return { label: 'GD', color: 'bg-blue-50 text-blue-700 border-blue-200' };
-    case 'ROLEPLAY':
-      return { label: 'Roleplay', color: 'bg-purple-50 text-purple-700 border-purple-200' };
-    case 'CASE_STUDY':
-      return { label: 'Case Study', color: 'bg-green-50 text-green-700 border-green-200' };
-    default:
-      return null;
-  }
-};
+const getInteractiveActivityTypeLabel = (type?: string) => interactionTypeBadge(type);
 
 const initialActivity = {
   activityType: "",
@@ -294,7 +286,7 @@ const SelectContentStep: React.FC = () => {
                   Select Activity Content
                   <span className="text-gray-400 text-xs cursor-help" title="Choose the specific content">?</span>
                 </label>
-                {/* Filter dropdown for Interactive Activities */}
+                {/* Filter dropdown for Interaction Activities */}
                 {activity.activityType === 'case-study' && (
                   <div className="mb-2">
                     <select
@@ -319,7 +311,7 @@ const SelectContentStep: React.FC = () => {
                     if (newActivities[idx]) {
                       // Also persist interactiveActivityType from the picked option,
                       // so downstream steps (ParticipantAssessorManagementStep) can
-                      // show "Group Discussion" / "Roleplay" / "Case Study" correctly.
+                      // show the interaction sub-type label correctly.
                       const opts = contentOptions[activity.activityType] || [];
                       const picked = opts.find(o => o.value === e.target.value);
                       newActivities[idx] = {
@@ -340,7 +332,7 @@ const SelectContentStep: React.FC = () => {
                     
                     // Filter options based on activity type filter
                     const filteredOptions = allOptions.filter(opt => {
-                      // Apply filter only for case-study (Interactive Activity)
+                      // Apply filter only for case-study (Interaction Activities)
                       if (activity.activityType !== 'case-study') return true;
                       if (!currentFilter) return true;
                       return opt.interactiveActivityType === currentFilter;

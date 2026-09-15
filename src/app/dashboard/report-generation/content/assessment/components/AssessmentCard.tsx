@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { MoreVertical, Edit, Trash2 } from 'lucide-react';
+import { interactionTypeBadge } from '@/lib/activityTaxonomy';
 import { Assessment, InteractiveActivityType } from '../types/assessment';
 
 interface AssessmentCardProps {
@@ -11,18 +12,7 @@ interface AssessmentCardProps {
   onRemove?: (id: string) => void;
 }
 
-const getActivityTypeBadge = (type?: InteractiveActivityType) => {
-  switch (type) {
-    case 'GD':
-      return { label: 'Group Discussion', color: 'bg-blue-50 text-blue-700 border-blue-200' };
-    case 'ROLEPLAY':
-      return { label: 'Roleplay', color: 'bg-purple-50 text-purple-700 border-purple-200' };
-    case 'CASE_STUDY':
-      return { label: 'Case Study', color: 'bg-green-50 text-green-700 border-green-200' };
-    default:
-      return null;
-  }
-};
+const getActivityTypeBadge = (type?: InteractiveActivityType) => interactionTypeBadge(type);
 
 const AssessmentCard: React.FC<AssessmentCardProps> = ({ 
   assessment, 

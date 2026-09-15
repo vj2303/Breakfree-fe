@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import AssessmentCard from './components/AssessmentCard';
 import CreateAssessmentModal from './components/CreateAssessmentModal';
 import { AssessmentType, CaseStudy, InteractiveActivityType } from './types/assessment';
+import { INTERACTION_ACTIVITY_TYPES_WITH_LEGACY } from '@/lib/activityTaxonomy';
 import { fetchCaseStudies, updateCaseStudy, deleteCaseStudy } from '@/lib/caseStudyApi';
 import { fetchInboxActivities, deleteInboxActivity } from '@/lib/inboxActivityApi';
 
@@ -41,9 +42,7 @@ interface InboxActivitiesResponse {
 
 const ACTIVITY_TYPE_OPTIONS: { value: InteractiveActivityType | 'ALL'; label: string }[] = [
   { value: 'ALL', label: 'All Types' },
-  { value: 'GD', label: 'Group Discussion (GD)' },
-  { value: 'ROLEPLAY', label: 'Roleplay' },
-  { value: 'CASE_STUDY', label: 'Case Study' },
+  ...INTERACTION_ACTIVITY_TYPES_WITH_LEGACY,
 ];
 
 export default function AssessmentPage() {
@@ -237,7 +236,7 @@ export default function AssessmentPage() {
                     : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
-                Interactive Activities
+                Interaction Activities
               </button>
               <button
                 onClick={() => handleTabChange('inbox-activity')}
@@ -251,7 +250,7 @@ export default function AssessmentPage() {
               </button>
             </div>
             
-            {/* Activity Type Filter - only show for Interactive Activities tab */}
+            {/* Activity Type Filter - only show for Interaction Activities tab */}
             {activeTab === 'case-study' && (
               <select
                 value={activityTypeFilter}
@@ -272,7 +271,7 @@ export default function AssessmentPage() {
             className="bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-900 transition-colors flex items-center gap-2"
           >
             <span className="text-lg">+</span>
-            {activeTab === 'inbox-activity' ? 'Create Inbox Activity' : 'Create Assessment'}
+            {activeTab === 'inbox-activity' ? 'Create Inbox Activity' : 'Create Interaction Activity'}
           </button>
         </div>
 
