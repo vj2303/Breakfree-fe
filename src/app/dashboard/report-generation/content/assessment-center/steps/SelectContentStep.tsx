@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Trash2 } from "lucide-react";
 import { useAssessmentForm } from '../create/context';
+import BarsImportPanel from '../BarsImportPanel';
 import { useAuth } from '@/context/AuthContext';
 import { API_BASE_URL_WITH_API } from '../../../../../../lib/apiConfig';
 import {
@@ -227,6 +228,8 @@ const SelectContentStep: React.FC = () => {
   return (
     <div>
       <h2 className="text-xl font-bold text-gray-900 mb-5">Assessment Center Details</h2>
+
+      <BarsImportPanel />
       
       {/* Basic Assessment Center Information */}
       <div className="mb-6 p-5 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200">

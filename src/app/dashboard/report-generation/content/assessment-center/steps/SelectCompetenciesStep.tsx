@@ -24,9 +24,27 @@ const SelectCompetenciesStep: React.FC = () => {
   const [error, setError] = useState('');
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
+  // Resolves selected ids to {id, name} in *selection* order. Order matters:
+  // the subject-exercise matrix indexes its rows against this array, so
+  // reordering here would silently shift every matrix toggle. Falls back to the
+  // library list held in context so a competency outside the fetched page (for
+  // example one just created by a BARS import) is not dropped.
+  const resolveSelectedData = (ids: string[]) => {
+    const library = (formData.competencyLibraryList || []) as CompetencyLibraryItem[];
+    return ids
+      .map(id => {
+        const fetched = competencies.find(comp => comp.id === id);
+        if (fetched) return { id, name: fetched.competencyName };
+        const known = library.find(comp => comp.id === id);
+        if (known) return { id, name: known.competencyName };
+        return null;
+      })
+      .filter((comp): comp is { id: string; name: string } => comp !== null);
+  };
+
   useEffect(() => {
     // Store both id and name for selected competencies
-    const selectedData = competencies.filter(comp => selectedCompetencies.includes(comp.id)).map(comp => ({ id: comp.id, name: comp.competencyName }));
+    const selectedData = resolveSelectedData(selectedCompetencies);
     updateFormData('competencyIds', selectedCompetencies);
     updateFormData('selectedCompetenciesData', selectedData);
     try {
@@ -40,7 +58,7 @@ const SelectCompetenciesStep: React.FC = () => {
   useEffect(() => {
     const handleStepSave = () => {
       try {
-        const selectedData = competencies.filter(comp => selectedCompetencies.includes(comp.id)).map(comp => ({ id: comp.id, name: comp.competencyName }));
+        const selectedData = resolveSelectedData(selectedCompetencies);
         console.log('=== SELECT COMPETENCIES STEP SAVED ===');
         console.log('Selected competency IDs:', selectedCompetencies);
         console.log('Selected competency data:', selectedData);
@@ -69,7 +87,7 @@ const SelectCompetenciesStep: React.FC = () => {
     try {
       console.log('Fetching competencies with token:', token ? 'Token available' : 'No token');
       
-      const res = await fetch(`${API_BASE_URL_WITH_API}/competency-libraries?page=1&limit=10&search=`, {
+      const res = await fetch(`${API_BASE_URL_WITH_API}/competency-libraries?page=1&limit=200&search=`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -87,9 +105,15 @@ const SelectCompetenciesStep: React.FC = () => {
       }
       
       const data = await res.json();
-      setCompetencies(data?.data?.competencyLibraries || []);
-      // Store the full list in context for other steps
-      updateFormData('competencyLibraryList', data?.data?.competencyLibraries || []);
+      const fetched: CompetencyLibraryItem[] = data?.data?.competencyLibraries || [];
+      setCompetencies(fetched);
+      // Store the full list in context for other steps, keeping any entry the
+      // fetch did not return (e.g. carried in by a BARS import) so downstream
+      // steps can still read its sub-competency names.
+      const fetchedIds = new Set(fetched.map(comp => comp.id));
+      const carriedOver = ((formData.competencyLibraryList || []) as CompetencyLibraryItem[])
+        .filter(comp => !fetchedIds.has(comp.id));
+      updateFormData('competencyLibraryList', [...fetched, ...carriedOver]);
     } catch (error) {
       console.error('Error fetching competencies:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch competencies';

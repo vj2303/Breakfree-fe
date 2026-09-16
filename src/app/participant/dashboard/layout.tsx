@@ -40,7 +40,7 @@ export default function ParticipantDashboardLayout({ children }: { children: Rea
         <div className="pt-6">
           <div className="mb-8 flex items-center justify-center px-4">
             <div className="flex items-center gap-2">
-              <Image src="/logo.png" alt="Breakfree Consulting" width={48} height={48} className="rounded" />
+              <Image src="/logo.png" alt="Breakfree Consulting" width={138} height={131} className="rounded w-12 h-auto" />
               <div className="flex flex-col">
                 <span className="text-xs font-semibold text-black leading-tight">BREAKFREE</span>
                 <span className="text-[10px] text-gray-600 leading-tight">CONSULTING</span>

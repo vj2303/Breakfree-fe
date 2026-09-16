@@ -74,9 +74,9 @@ export default function Navbar() {
               <Image
                 src="/logo.png"
                 alt="Breakfree Consulting"
-                width={40}
-                height={40}
-                className="mr-3"
+                width={138}
+                height={131}
+                className="mr-3 w-10 h-auto"
               />
               <span className="text-lg font-semibold text-gray-900">
                 Breakfree Consulting

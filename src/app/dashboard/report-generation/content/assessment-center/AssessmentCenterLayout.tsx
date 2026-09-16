@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Check, ChevronRight, Info } from "lucide-react";
 
 interface Step {
@@ -45,6 +45,14 @@ const AssessmentCenterLayout: React.FC<AssessmentCenterLayoutProps> = ({
   isEditMode = false,
   assessmentCenterName,
 }) => {
+  // Today's date is only known correctly on the client — rendering it on the
+  // server risks a different timezone (and so a different day) than the
+  // browser, which React reports as a hydration mismatch.
+  const [createdOn, setCreatedOn] = useState<string | null>(null);
+  useEffect(() => {
+    setCreatedOn(new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }));
+  }, []);
+
   const steps: Step[] = stepTitles.map((title, idx) => ({
     id: `step-${idx}`,
     title,
@@ -90,7 +98,7 @@ const AssessmentCenterLayout: React.FC<AssessmentCenterLayoutProps> = ({
                 <p className="text-sm text-gray-500 mt-1">
                   {assessmentCenterName 
                     ? (isEditMode ? `Editing: ${assessmentCenterName}` : `Creating: ${assessmentCenterName}`)
-                    : (isEditMode ? 'Editing existing assessment center' : `Created on ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`)
+                    : (isEditMode ? 'Editing existing assessment center' : (createdOn ? `Created on ${createdOn}` : ''))
                   }
                 </p>
               </div>

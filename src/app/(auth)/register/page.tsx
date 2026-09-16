@@ -135,9 +135,9 @@ export default function MultiStepRegister() {
             <Image
               src="/logo.png"
               alt="Breakfree Consulting"
-              width={100}
-              height={100}
-              className="mx-auto"
+              width={138}
+              height={131}
+              className="mx-auto w-[100px] h-auto"
             />
           </div>
         </div>

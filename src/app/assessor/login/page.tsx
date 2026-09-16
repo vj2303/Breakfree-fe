@@ -92,9 +92,9 @@ export default function AssessorLogin() {
             <Image
               src="/logo.png"
               alt="Breakfree Consulting"
-              width={120}
-              height={120}
-              className="mx-auto"
+              width={138}
+              height={131}
+              className="mx-auto w-[120px] h-auto"
             />
           </div>
         </div>

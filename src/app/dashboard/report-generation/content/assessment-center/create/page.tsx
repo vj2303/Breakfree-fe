@@ -40,6 +40,26 @@ const STORAGE_KEYS = {
 //   [key: string]: unknown;
 // }
 
+// The form always starts empty. Persisted data is layered on *after* mount —
+// reading localStorage during render makes the server and client first renders
+// disagree, which React reports as a hydration mismatch.
+const createEmptyFormData = (): FormData => ({
+  name: '',
+  description: '',
+  displayName: '',
+  displayInstructions: '',
+  competencyIds: [],
+  selectedCompetenciesData: [],
+  reportTemplateName: '',
+  reportTemplateType: '',
+  activities: [],
+  assignments: [],
+  document: null,
+  existingDocumentUrl: null,
+  descriptors: {},
+  matrix: [],
+});
+
 const AssessmentFormProvider: React.FC<{ children: React.ReactNode; editId?: string }> = ({ children, editId }) => {
   // Helper function to load persisted form data
   const loadPersistedFormData = (): FormData | null => {
@@ -57,40 +77,7 @@ const AssessmentFormProvider: React.FC<{ children: React.ReactNode; editId?: str
     return null;
   };
 
-  // Initialize form data - load persisted data first, then API will update if needed
-  const initialFormData = (() => {
-    // Try to load persisted data first (works for both create and edit mode)
-    const persisted = loadPersistedFormData();
-    const persistedEditId = typeof window !== 'undefined' 
-      ? localStorage.getItem(STORAGE_KEYS.EDIT_ID) 
-      : null;
-    
-    // If we have persisted data and it matches the current editId (or both are create mode)
-    if (persisted && (!editId || persistedEditId === editId)) {
-      console.log('📦 [Assessment Center] Loading persisted form data on initialization');
-      return persisted;
-    }
-    
-    // Otherwise, return empty form data
-    return {
-      name: '',
-      description: '',
-      displayName: '',
-      displayInstructions: '',
-      competencyIds: [],
-      selectedCompetenciesData: [],
-      reportTemplateName: '',
-      reportTemplateType: '',
-      activities: [],
-      assignments: [],
-      document: null,
-      existingDocumentUrl: null,
-      descriptors: {},
-      matrix: [], // Initialize empty matrix
-    };
-  })();
-
-  const [formData, setFormData] = useState<FormData>(initialFormData);
+  const [formData, setFormData] = useState<FormData>(createEmptyFormData);
   const [isLoading, setIsLoading] = useState(false);
   const { token } = useAuth();
   
@@ -100,6 +87,21 @@ const AssessmentFormProvider: React.FC<{ children: React.ReactNode; editId?: str
   const skipPersistenceRef = useRef(false);
   const hasLoadedApiDataRef = useRef(false);
   const apiLoadInProgressRef = useRef(false);
+
+  // Restore persisted form data once, after mount. Runs before the persistence
+  // effect below, whose first invocation is skipped, so the empty initial state
+  // is never flushed over what was saved.
+  useEffect(() => {
+    const persisted = loadPersistedFormData();
+    const persistedEditId = localStorage.getItem(STORAGE_KEYS.EDIT_ID);
+
+    // Only adopt it when it belongs to the same record (or both are create mode).
+    if (persisted && (!editId || persistedEditId === editId)) {
+      console.log('📦 [Assessment Center] Restoring persisted form data after mount');
+      setFormData(persisted);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId]);
 
   // Persist form data to localStorage whenever it changes (but not during initial API load)
   useEffect(() => {
@@ -513,23 +515,9 @@ const CreateAssessmentCenterContent = ({ editId }: { editId?: string }) => {
     return 0;
   };
 
-  const [currentStep, setCurrentStep] = useState(() => {
-    // Load persisted step if it exists (works for both create and edit mode)
-    // Check if persisted editId matches current editId
-    if (editId) {
-      const persistedEditId = typeof window !== 'undefined' 
-        ? localStorage.getItem(STORAGE_KEYS.EDIT_ID) 
-        : null;
-      // Only load persisted step if it matches the current editId
-      if (persistedEditId === editId) {
-        const persistedStep = loadPersistedStep();
-        console.log('📦 [Assessment Center] Loading persisted step for edit:', persistedStep);
-        return persistedStep;
-      }
-      return 0;
-    }
-    return loadPersistedStep();
-  });
+  // Always start at step 0 so the server and client first renders agree; the
+  // persisted step is restored after mount (see the effect below).
+  const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -539,9 +527,31 @@ const CreateAssessmentCenterContent = ({ editId }: { editId?: string }) => {
   
   // Ref to track last persisted step to prevent unnecessary writes
   const lastPersistedStepRef = useRef<number | null>(null);
+  const isStepInitializingRef = useRef(true);
+
+  // Restore the persisted step after mount. Declared before the persistence
+  // effect so the initial 0 is never written over the saved step.
+  useEffect(() => {
+    if (editId) {
+      // Only adopt the persisted step when it belongs to the record being edited.
+      if (localStorage.getItem(STORAGE_KEYS.EDIT_ID) !== editId) return;
+      console.log('📦 [Assessment Center] Restoring persisted step for edit');
+    }
+    const persistedStep = loadPersistedStep();
+    if (persistedStep !== 0) {
+      setCurrentStep(persistedStep);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId]);
 
   // Persist current step whenever it changes
   useEffect(() => {
+    // Skip the first run: at that point currentStep is still the pre-restore 0.
+    if (isStepInitializingRef.current) {
+      isStepInitializingRef.current = false;
+      return;
+    }
+
     // Only persist if step actually changed
     if (lastPersistedStepRef.current === currentStep) {
       return;

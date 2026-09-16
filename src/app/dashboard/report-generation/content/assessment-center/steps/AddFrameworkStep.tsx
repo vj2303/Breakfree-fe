@@ -277,8 +277,11 @@ const CompetencyFramework = () => {
           </div>
         ) : (
           <div>
-            {/* Tabs */}
-            <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
+            {/* Tabs — one per activity, so the strip overflows once an
+                assessment centre has more than a handful. Keep the scrollbar
+                visible rather than hidden, otherwise the tabs past the right
+                edge give no hint that they are there. */}
+            <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-thin">
               {activitiesWithCompetencies.map((item, activityIdx) => {
                 const activityId = getActivityId(item.activity, activityIdx);
                 const activityName = getActivityDisplayName(item.activity);
