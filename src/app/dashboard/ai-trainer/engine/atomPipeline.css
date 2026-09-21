@@ -1,0 +1,237 @@
+/* AI for Trainers — atom pipeline styles, ported from the standalone
+   "atom-pipeline" HTML and scoped under .atom-app so nothing leaks into the
+   rest of the dashboard. Generated 1:1 from the source; edit with care. */
+
+/* Undo the parts of Tailwind's preflight the source design relied on
+   browser defaults for. These come first so every rule below wins. */
+.atom-app{min-height:100vh;}
+.atom-app h1{font-size:2em;}
+.atom-app h2{font-size:1.5em;}
+.atom-app h3{font-size:1.17em;}
+.atom-app p{margin:1em 0;}
+.atom-app ul{list-style:disc; margin:1em 0; padding-left:40px;}
+.atom-app ol{list-style:decimal; margin:1em 0; padding-left:40px;}
+.atom-app strong{font-weight:700;}
+
+.atom-app{--bf-ink:#1B2333; --bf-soft:#7A8496; --bf-line:#E4E7EC; --bf-bg:#FBFBFC; --bf-card:#FFFFFF;
+  --bf-blue:#3B63E0; --bf-blue-tint:#EAF0FE;
+  --bf-green:#3E9B5C; --bf-yellow:#C79A1E; --bf-pink:#C6408A; --bf-teal:#1E8F86; --bf-red:#C4472E;
+  --ink:#12213B; --ink-soft:#4C5A73; --paper:#F4F6F8; --card:#FFFFFF;
+  --line:#DCE1E8; --gold:#A9791F; --teal:#1F6E5C; --red:#B23A2E; --radius:14px;}
+.atom-app *{box-sizing:border-box;}
+.atom-app{margin:0; font-family:'Manrope',sans-serif; background:var(--bf-bg); color:var(--bf-ink);}
+.atom-app button, .atom-app input, .atom-app select, .atom-app textarea{font-family:'Manrope',sans-serif;}
+.atom-app h1, .atom-app h2, .atom-app h3{font-family:'Source Serif 4',serif; font-weight:600; margin:0;}
+.atom-app .shell{display:flex; min-height:100vh;}
+.atom-app .sidebar{width:92px; background:#fff; border-right:1px solid var(--bf-line); display:flex; flex-direction:column; align-items:center; padding:22px 0; gap:6px;}
+.atom-app .side-logo{width:34px; height:34px; border-radius:50%; background:var(--bf-ink); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; margin-bottom:26px;}
+.atom-app .side-item{display:flex; flex-direction:column; align-items:center; gap:4px; padding:10px 12px; border-radius:12px; color:var(--bf-soft); font-size:11.5px; cursor:pointer; margin-bottom:6px;}
+.atom-app .side-item.active{background:linear-gradient(135deg,#F3EEFC,#EAF0FE); color:var(--bf-blue); box-shadow:inset 0 0 0 1px rgba(59,99,224,0.15);}
+.atom-app .side-item svg{width:20px; height:20px;}
+.atom-app .side-spacer{flex:1;}
+.atom-app .main{flex:1; display:flex; flex-direction:column;}
+.atom-app .topbar{display:flex; align-items:center; justify-content:space-between; padding:18px 32px; border-bottom:1px solid var(--bf-line); background:linear-gradient(180deg,#FFFFFF 0%, #FBFAFE 100%);}
+.atom-app .brand{display:flex; align-items:center; gap:10px; font-weight:700; font-size:15px;}
+.atom-app .brand .mark{width:26px; height:26px; border-radius:50%; background:linear-gradient(135deg,var(--bf-pink),var(--bf-blue));}
+.atom-app .user-chip{display:flex; align-items:center; gap:10px;}
+.atom-app .user-chip .avatar{width:32px; height:32px; border-radius:50%; background:var(--bf-ink); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;}
+.atom-app .user-chip .who{font-size:12.5px; line-height:1.3;}
+.atom-app .user-chip .who .name{font-weight:600;}
+.atom-app .user-chip .who .email{color:var(--bf-soft);}
+.atom-app .content{flex:1; padding:44px 32px 60px; max-width:960px; margin:0 auto; width:100%;}
+.atom-app .pipe-stepper{display:flex; gap:0; margin-bottom:34px;}
+.atom-app .pipe-pill{flex:1; position:relative; padding:16px 6px 12px; text-align:center; font-size:12.5px; font-weight:600; color:var(--bf-soft);
+  background:var(--bf-card); border-top:1px solid var(--bf-line); border-bottom:1px solid var(--bf-line); border-right:1px solid var(--bf-line);}
+.atom-app .pipe-pill:first-child{border-left:1px solid var(--bf-line); border-radius:12px 0 0 12px;}
+.atom-app .pipe-pill:last-child{border-radius:0 12px 12px 0;}
+.atom-app .pipe-pill .n{display:flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%;
+  background:var(--bf-line); color:var(--bf-soft); font-size:12px; font-weight:800; margin:0 auto 6px;}
+.atom-app .pipe-pill.active{color:var(--bf-ink); background:linear-gradient(180deg, #F3EEFC 0%, #EAF0FE 100%);}
+.atom-app .pipe-pill.active .n{background:linear-gradient(135deg,var(--bf-pink),var(--bf-blue)); color:#fff; box-shadow:0 0 0 4px rgba(59,99,224,0.12);}
+.atom-app .pipe-pill.done{color:var(--bf-teal); cursor:pointer;}
+.atom-app .pipe-pill.done .n{background:var(--bf-teal); color:#fff;}
+.atom-app .pipe-pill.done:hover{background:#F2FBF8;}
+.atom-app .accent-strip{height:4px; border-radius:3px; width:56px; margin:0 auto 16px; background:linear-gradient(90deg,var(--bf-pink),var(--bf-blue));}
+.atom-app .create-head{text-align:center; margin-bottom:30px;}
+.atom-app .create-head h1{font-size:32px; margin-bottom:10px;}
+.atom-app .create-head p{color:var(--bf-soft); font-size:14.5px; max-width:600px; margin:0 auto; line-height:1.6;}
+.atom-app .dropzone{border:1.5px dashed var(--bf-line); border-radius:16px; background:var(--bf-card); padding:28px; text-align:center; margin-bottom:22px; cursor:pointer;}
+.atom-app .dropzone:hover{border-color:var(--bf-blue);}
+.atom-app .dropzone .dz-title{font-weight:700; font-size:15px; margin-bottom:4px;}
+.atom-app .dropzone .dz-sub{color:var(--bf-soft); font-size:13px;}
+.atom-app .file-row{display:flex; align-items:center; justify-content:space-between; background:var(--bf-card); border:1px solid var(--bf-line); border-radius:12px; padding:14px 16px; margin-bottom:10px; box-shadow:0 1px 2px rgba(27,35,51,0.04);}
+.atom-app .file-info{display:flex; align-items:center; gap:12px;}
+.atom-app .file-icon{width:38px; height:38px; border-radius:10px; background:var(--bf-blue-tint); color:var(--bf-blue); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:11px; flex-shrink:0;}
+.atom-app .file-meta .fname{font-weight:600; font-size:14px;}
+.atom-app .file-meta .fstatus{font-size:12.5px; color:var(--bf-soft);}
+.atom-app .remove-file{border:none; background:none; color:var(--bf-soft); cursor:pointer; font-size:13px; text-decoration:underline;}
+.atom-app .item-card{background:var(--bf-card); border:1px solid var(--bf-line); border-radius:12px; padding:16px 18px; margin-bottom:14px; box-shadow:0 1px 2px rgba(27,35,51,0.04), 0 4px 14px rgba(27,35,51,0.03);}
+.atom-app .item-card label{display:block; font-size:11.5px; font-weight:700; color:var(--bf-soft); margin:10px 0 4px;}
+.atom-app .item-card label:first-child{margin-top:0;}
+.atom-app .item-card input[type=text], .atom-app .item-card textarea{width:100%; border:1px solid var(--bf-line); border-radius:8px; padding:9px 11px; font-size:13.5px; resize:vertical;}
+.atom-app .item-card textarea{min-height:70px; line-height:1.5;}
+.atom-app .generate-row{display:flex; justify-content:center; margin-top:18px;}
+.atom-app .generate-btn{background:var(--bf-ink); color:#fff; border:none; padding:14px 30px; border-radius:999px; font-size:15px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:8px;}
+.atom-app .generate-btn:disabled{opacity:0.35; cursor:default;}
+.atom-app .status-line{text-align:center; color:var(--bf-soft); font-size:13px; margin-top:14px;}
+.atom-app .error-banner{background:#FBEAE8; border:1px solid var(--bf-red); color:var(--bf-red); padding:10px 14px; border-radius:10px; font-size:13.5px; margin-bottom:16px; white-space:pre-line;}
+.atom-app .btn-secondary{background:none; border:1px solid var(--bf-line); color:var(--bf-ink); padding:11px 18px; border-radius:999px; font-weight:600; cursor:pointer; font-size:13.5px;}
+.atom-app .btn-primary{background:var(--bf-ink); color:#fff; border:none; padding:11px 20px; border-radius:999px; font-weight:700; cursor:pointer; font-size:13.5px;}
+.atom-app .badge-pill{display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.02em;}
+.atom-app .badge-approved{background:#E7F3EF; color:var(--bf-teal);}
+.atom-app .badge-review{background:#FDF0DD; color:#A9791F;}
+.atom-app .badge-rejected{background:#FBEAE8; color:var(--bf-red);}
+.atom-app .badge-conflict{background:#FBEAE8; color:var(--bf-red);}
+.atom-app .badge-single{background:var(--bf-line); color:var(--bf-soft);}
+.atom-app .badge-type{background:var(--bf-blue-tint); color:var(--bf-blue); margin-left:6px;}
+.atom-app .group-card{background:var(--bf-card); border:1px solid var(--bf-line); border-radius:12px; padding:16px 18px; margin-bottom:12px; box-shadow:0 1px 2px rgba(27,35,51,0.04), 0 4px 14px rgba(27,35,51,0.03);}
+.atom-app .group-head{display:flex; align-items:center; justify-content:space-between; cursor:pointer;}
+.atom-app .group-head .topic{font-weight:700; font-size:14.5px;}
+.atom-app .group-head .meta{font-size:12px; color:var(--bf-soft); margin-top:3px;}
+.atom-app .group-body{margin-top:14px; border-top:1px solid var(--bf-line); padding-top:14px;}
+.atom-app .atom-row{padding:10px 0; border-top:1px solid var(--bf-line);}
+.atom-app .atom-row:first-child{border-top:none;}
+.atom-app .atom-row .src{font-size:11.5px; color:var(--bf-soft); margin-bottom:4px;}
+.atom-app .atom-row .body-text{font-size:13.5px; line-height:1.55;}
+.atom-app .conflict-note{background:#FBEAE8; border-radius:10px; padding:12px 14px; margin:10px 0; font-size:13px; color:#791F1F;}
+.atom-app .lib-filters{display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap;}
+.atom-app .lib-filter{padding:7px 14px; border-radius:999px; border:1px solid var(--bf-line); background:#fff; font-size:12.5px; font-weight:600; cursor:pointer; color:var(--bf-soft);}
+.atom-app .lib-filter.active{background:var(--bf-ink); color:#fff; border-color:var(--bf-ink);}
+.atom-app .review-card{background:var(--bf-card); border:1px solid var(--bf-line); border-radius:12px; padding:18px 20px; margin-bottom:16px; box-shadow:0 1px 2px rgba(27,35,51,0.04), 0 6px 18px rgba(27,35,51,0.04); border-left:3px solid var(--bf-yellow);}
+.atom-app .review-reasons{display:flex; gap:6px; flex-wrap:wrap; margin:8px 0 12px;}
+.atom-app .reason-chip{background:#FDF0DD; color:#A9791F; font-size:11px; font-weight:700; padding:3px 10px; border-radius:999px;}
+.atom-app .sibling-box{background:var(--bf-bg); border-radius:8px; padding:10px 12px; margin-bottom:8px; font-size:13px;}
+.atom-app .sibling-box .src{font-size:11px; color:var(--bf-soft); margin-bottom:3px;}
+.atom-app .review-actions{display:flex; gap:10px; margin-top:14px;}
+.atom-app .build-pick{background:var(--bf-card); border:1px solid var(--bf-line); border-radius:12px; padding:16px 18px; margin-bottom:12px; cursor:pointer; box-shadow:0 1px 2px rgba(27,35,51,0.04); transition:box-shadow .15s ease;}
+.atom-app .build-pick:hover{box-shadow:0 4px 14px rgba(27,35,51,0.07);}
+.atom-app .build-pick.selected{border-color:var(--bf-blue); background:var(--bf-blue-tint);}
+.atom-app .build-pick .topic{font-weight:700; font-size:14.5px;}
+.atom-app .build-pick .meta{font-size:12px; color:var(--bf-soft); margin-top:3px;}
+.atom-app .section-block{margin-bottom:20px;}
+.atom-app .section-block h2{font-family:'Source Serif 4',serif; font-weight:600;}
+.atom-app .small-upload{font-size:12px; color:var(--bf-blue); cursor:pointer; text-decoration:underline;}
+.atom-app .gallery-strip{display:flex; gap:8px; flex-wrap:wrap;}
+.atom-app .gallery-thumb{width:56px; height:56px; border-radius:8px; overflow:hidden; border:2px solid transparent; cursor:pointer; background:var(--bf-line); flex-shrink:0;}
+.atom-app .gallery-thumb img{width:100%; height:100%; object-fit:cover;}
+.atom-app .gallery-thumb.selected{border-color:var(--bf-blue);}
+.atom-app .modal-overlay{position:fixed; inset:0; background:rgba(18,17,40,0.55); display:flex; align-items:center; justify-content:center; z-index:1000;}
+.atom-app .modal-card{background:#fff; border-radius:14px; padding:24px 26px; width:380px; max-width:90vw; box-shadow:0 20px 50px rgba(20,18,58,0.3);}
+.atom-app .modal-title{font-family:'Source Serif 4',serif; font-weight:600; font-size:18px; color:var(--bf-ink); margin-bottom:4px;}
+.atom-app .modal-card .modal-field{width:100%; border:1px solid var(--bf-line); border-radius:8px; padding:10px 12px; font-size:13.5px; margin-top:12px; font-family:'Manrope';}
+.atom-app .modal-card label{display:block; font-size:11.5px; font-weight:700; color:var(--bf-soft); margin:12px 0 4px;}
+.atom-app .modal-card label:first-of-type{margin-top:14px;}
+.atom-app .modal-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:20px;}
+.atom-app .tiles{display:flex; gap:14px; margin-bottom:22px; flex-wrap:wrap;}
+.atom-app .tile{flex:1; min-width:150px; background:var(--bf-card); border:1px solid var(--bf-line); border-radius:14px; padding:14px 16px; box-shadow:0 1px 2px rgba(27,35,51,0.04);}
+.atom-app .tile .icon{width:26px; height:26px; border-radius:8px; display:flex; align-items:center; justify-content:center; margin-bottom:14px; font-size:12px;}
+.atom-app .tile .label{font-weight:700; font-size:12.5px; margin-bottom:4px;}
+.atom-app .tile select{width:100%; border:none; background:transparent; font-weight:700; font-size:12.5px; padding:0; color:var(--bf-ink); appearance:none; cursor:pointer;}
+.atom-app .mode-card{flex:1; background:var(--bf-card); border:1.5px solid var(--bf-line); border-radius:14px; padding:20px; cursor:pointer; transition:border-color .15s ease, box-shadow .15s ease;}
+.atom-app .mode-card:hover{box-shadow:0 4px 14px rgba(27,35,51,0.07);}
+.atom-app .mode-card.selected{border-color:var(--bf-blue); background:var(--bf-blue-tint);}
+.atom-app .player-topbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid var(--line);}
+.atom-app .player-topbar a{font-size:12.5px; color:var(--ink-soft); text-decoration:none; font-weight:600;}
+.atom-app .player-topbar a:hover{color:var(--ink);}
+.atom-app .player-topbar-title{font-size:12px; color:var(--ink-soft); font-style:italic;}
+.atom-app #player-root{width:100%; max-width:700px; margin:0 auto; padding:28px 16px; font-family:'Manrope',sans-serif; color:var(--ink);}
+.atom-app #player-root h1, .atom-app #player-root h2, .atom-app #player-root h3{font-family:'Source Serif 4',serif; font-weight:600; margin:0;}
+.atom-app #player-root .eyebrow{font-size:13px; color:var(--ink-soft); margin-bottom:6px;}
+.atom-app #player-root .subtle{color:var(--ink-soft); font-size:14px; line-height:1.5;}
+.atom-app #player-root p{line-height:1.6;}
+.atom-app .stepper{display:flex; gap:8px; margin-bottom:26px;}
+.atom-app .step-pill{flex:1; padding:10px 6px; text-align:center; border-radius:10px; font-size:13px; font-weight:600; background:var(--card); border:1px solid var(--line); color:var(--ink-soft); cursor:default;}
+.atom-app .step-bloom{display:block; font-size:9.5px; font-weight:500; text-transform:uppercase; letter-spacing:0.02em; opacity:0.75; margin-top:2px;}
+.atom-app .step-pill.done{background:var(--teal); color:#fff; border-color:var(--teal); cursor:pointer;}
+.atom-app .step-pill.active{background:var(--ink); color:#fff; border-color:var(--ink);}
+.atom-app .step-pill.unlocked{cursor:pointer;}
+.atom-app .card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:26px;}
+.atom-app .btn{display:inline-flex; align-items:center; gap:8px; background:var(--ink); color:#fff; border:none; padding:12px 22px; border-radius:999px; font-family:'Manrope'; font-size:15px; font-weight:600; cursor:pointer;}
+.atom-app .btn.secondary{background:transparent; color:var(--ink); border:1px solid var(--line);}
+.atom-app .btn.end{background:var(--red);}
+.atom-app .btn:disabled{opacity:0.45; cursor:default;}
+.atom-app .intro h1{font-size:27px; line-height:1.25; margin-bottom:10px;}
+.atom-app .hero-band{background:linear-gradient(135deg, var(--ink) 0%, #14372E 100%); border-radius:var(--radius); padding:40px 32px; margin-bottom:20px; position:relative; overflow:hidden;}
+.atom-app .hero-band::before{content:''; position:absolute; top:-50px; right:-50px; width:200px; height:200px; border-radius:50%; background:rgba(169,121,31,0.16);}
+.atom-app .hero-band::after{content:''; position:absolute; bottom:-70px; left:-30px; width:160px; height:160px; border-radius:50%; background:rgba(31,110,92,0.35);}
+.atom-app .hero-eyebrow{position:relative; color:var(--gold); font-size:12px; font-weight:700; letter-spacing:0.1em; margin-bottom:12px;}
+.atom-app .hero-title{position:relative; color:#fff; font-family:'Source Serif 4',serif; font-size:30px; font-weight:600; line-height:1.25; margin-bottom:14px;}
+.atom-app .hero-sub{position:relative; color:#D7DEE8; font-size:14.5px; line-height:1.6; max-width:480px; margin-bottom:20px;}
+.atom-app .hero-rule{position:relative; width:56px; height:3px; background:var(--gold); border-radius:2px;}
+.atom-app .overview-body{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:26px 28px; margin-bottom:20px;}
+.atom-app .overview-body h2{font-size:18px; margin-bottom:10px;}
+.atom-app .overview-body h2:not(:first-child){margin-top:22px;}
+.atom-app .overview-body ol{padding-left:20px; margin:0;}
+.atom-app .overview-body li{margin-bottom:9px; line-height:1.6; font-size:14.5px;}
+.atom-app .objective-row{display:flex; gap:12px; margin:22px 0;}
+.atom-app .objective-row .obj{flex:1; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px;}
+.atom-app .objective-row .obj .k{font-size:12px; color:var(--gold); font-weight:700; margin-bottom:4px;}
+.atom-app .objective-row .obj .v{font-size:13.5px; color:var(--ink-soft); line-height:1.4;}
+.atom-app .read-section{margin-bottom:22px;}
+.atom-app .read-section h2{font-size:19px; margin-bottom:10px;}
+.atom-app .watch-frame{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; margin-bottom:16px;}
+.atom-app .watch-frame img{width:100%; display:block; border-bottom:1px solid var(--line); background:var(--paper);}
+.atom-app .watch-caption{padding:18px 22px;}
+.atom-app .watch-caption .step-label{font-size:12.5px; color:var(--gold); font-weight:700; margin-bottom:6px;}
+.atom-app .watch-caption p{margin:0; font-size:15px;}
+.atom-app .watch-controls{display:flex; align-items:center; justify-content:space-between; margin-top:14px;}
+.atom-app .watch-dots{display:flex; gap:6px;}
+.atom-app .dot{width:8px; height:8px; border-radius:50%; background:var(--line);}
+.atom-app .dot.active{background:var(--ink);}
+.atom-app .watch-btns{display:flex; gap:8px;}
+.atom-app .scenario-card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:20px 22px; margin-bottom:14px; cursor:pointer;}
+.atom-app .scenario-card h3{font-size:18px; margin-bottom:6px;}
+.atom-app .scenario-card p{margin:0; font-size:14px; color:var(--ink-soft); line-height:1.5;}
+.atom-app .call-header{display:flex; align-items:center; gap:14px; margin-bottom:20px;}
+.atom-app .avatar{width:52px; height:52px; border-radius:50%; background:var(--ink); color:#fff; display:flex; align-items:center; justify-content:center; font-family:'Source Serif 4'; font-size:19px; flex-shrink:0;}
+.atom-app .avatar.speaking{box-shadow:0 0 0 4px rgba(18,33,59,0.15);}
+.atom-app .call-status{font-size:13px; color:var(--ink-soft);}
+.atom-app .call-status.live::before{content:"●"; color:var(--teal); margin-right:6px;}
+.atom-app .transcript{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:18px 20px; height:300px; overflow-y:auto; margin-bottom:16px;}
+.atom-app .line{margin-bottom:14px; font-size:14.5px; line-height:1.55;}
+.atom-app .line .speaker{font-weight:700; font-size:12.5px; color:var(--ink-soft); display:block; margin-bottom:2px;}
+.atom-app .line.customer .speaker{color:var(--gold);}
+.atom-app .line.agent .speaker{color:var(--teal);}
+.atom-app .controls{display:flex; flex-direction:column; gap:10px;}
+.atom-app .mic-row{display:flex; gap:10px; align-items:center;}
+.atom-app .mic-btn{width:56px; height:56px; border-radius:50%; border:none; background:var(--teal); color:#fff; font-size:22px; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center;}
+.atom-app .mic-btn.listening{background:var(--gold);}
+.atom-app .mic-btn:disabled{opacity:0.4;}
+.atom-app .text-fallback{flex:1; display:flex; gap:8px;}
+.atom-app .text-fallback input{flex:1; padding:12px 14px; border-radius:999px; border:1px solid var(--line); font-family:'Manrope'; font-size:14px;}
+.atom-app .text-fallback button{border:none; background:var(--ink); color:#fff; border-radius:999px; padding:0 18px; font-family:'Manrope'; font-weight:600; cursor:pointer;}
+.atom-app .footer-row{display:flex; justify-content:space-between; align-items:center; margin-top:6px; gap:10px; flex-wrap:wrap;}
+.atom-app .hint{font-size:12.5px; color:var(--ink-soft);}
+.atom-app .rubric-item{display:flex; gap:12px; padding:12px 0; border-top:1px solid var(--line);}
+.atom-app .rubric-item:first-of-type{border-top:none;}
+.atom-app .mark{width:22px; height:22px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:13px; color:#fff; font-weight:700; margin-top:1px;}
+.atom-app .mark.yes{background:var(--teal);}
+.atom-app .mark.no{background:var(--red);}
+.atom-app .rubric-item .label{font-size:14.5px; line-height:1.5;}
+.atom-app .rubric-item .comment{font-size:13px; color:var(--ink-soft); margin-top:3px;}
+.atom-app .reference{background:var(--paper); border-radius:10px; padding:16px 18px; margin-top:20px; font-size:14px; line-height:1.6; color:var(--ink-soft);}
+.atom-app .reference strong{color:var(--ink);}
+.atom-app .loading{font-size:14px; color:var(--ink-soft); font-style:italic;}
+.atom-app .quiz-progress{font-size:13px; color:var(--ink-soft); margin-bottom:10px;}
+.atom-app .quiz-q{font-size:17px; margin-bottom:16px; line-height:1.5;}
+.atom-app .quiz-opt{display:block; width:100%; text-align:left; background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:13px 16px; margin-bottom:10px; font-family:'Manrope'; font-size:14.5px; cursor:pointer;}
+.atom-app .quiz-opt.correct{background:#E7F3EF; border-color:var(--teal); color:var(--teal); font-weight:600;}
+.atom-app .quiz-opt.incorrect{background:#FBEAE8; border-color:var(--red); color:var(--red); font-weight:600;}
+.atom-app .quiz-opt:disabled{cursor:default;}
+.atom-app .quiz-explain{background:var(--paper); border-radius:10px; padding:14px 16px; font-size:13.5px; color:var(--ink-soft); margin:14px 0; line-height:1.6;}
+.atom-app .badge-row{display:flex; gap:10px; margin:18px 0;}
+.atom-app .format-switch{display:flex; gap:6px; margin-bottom:20px; background:var(--paper); border-radius:999px; padding:4px; width:fit-content;}
+.atom-app .fmt-btn{border:none; background:none; padding:7px 16px; border-radius:999px; font-family:'Manrope'; font-size:13px; font-weight:600; color:var(--ink-soft); cursor:pointer;}
+.atom-app .fmt-btn.active{background:var(--ink); color:#fff;}
+.atom-app .flashcard-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:14px; margin-bottom:10px;}
+.atom-app .flashcard{position:relative; height:110px; perspective:800px; cursor:pointer;}
+.atom-app .flashcard-face{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; padding:12px; border-radius:10px; backface-visibility:hidden; transition:transform .4s ease; font-size:13px; line-height:1.4;}
+.atom-app .flashcard-front{background:var(--paper); border:1px solid var(--line); font-weight:700; color:var(--ink); transform:rotateY(0deg);}
+.atom-app .flashcard-back{background:var(--ink); color:#fff; transform:rotateY(180deg);}
+.atom-app .flashcard.flipped .flashcard-front{transform:rotateY(-180deg);}
+.atom-app .flashcard.flipped .flashcard-back{transform:rotateY(0deg);}
+.atom-app .key-callout{display:flex; align-items:flex-start; gap:10px; margin-top:12px; padding:12px 16px; background:var(--paper); border-left:3px solid var(--teal); border-radius:0 8px 8px 0; font-size:13.5px; font-weight:600; color:var(--ink);}
+.atom-app .key-callout-icon{color:var(--teal); font-size:14px; line-height:1.4; flex-shrink:0;}
+.atom-app .badge{flex:1; background:var(--paper); border-radius:10px; padding:14px; text-align:center;}
+.atom-app .badge .n{font-family:'Source Serif 4'; font-size:22px;}
+.atom-app .badge .l{font-size:12px; color:var(--ink-soft); margin-top:2px;}

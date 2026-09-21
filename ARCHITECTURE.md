@@ -119,11 +119,12 @@
 ```
 /dashboard (Admin Home)
     │
-    ├──▶ AI for Trainers → /dashboard/ai-trainer/create
+    ├──▶ AI for Trainers → /dashboard/ai-trainer (atom pipeline, own sidebar)
     │         │
-    │         ├── Create: Set content_type, audience_type, delivery_method, etc.
-    │         ├── Responses: View generated prompts, select one
-    │         └── Chat: Chat with selected prompt (external API: NEXT_PUBLIC_BASE_URL/generate-prompts)
+    │         ├── Create: Create → Review → Library → Build → Path (source docs → atoms → modules)
+    │         ├── Library / Learners / Plan / Evaluate
+    │         ├── Learner Player: Read → Watch → Practice (roleplay call) → Check
+    │         └── Backend: /api/ai-trainer/complete (model proxy), /api/ai-trainer/workspace (autosave)
     │
     └──▶ SkillSightAI (Report Generation) → /dashboard/report-generation/content
               │
@@ -245,10 +246,10 @@ src/
 │   ├── dashboard/                # Admin dashboard
 │   │   ├── layout.tsx
 │   │   ├── page.tsx              # Dashboard home (AI Trainers | Report Generation)
-│   │   ├── ai-trainer/           # AI for Trainers
+│   │   ├── ai-trainer/           # AI for Trainers (atom pipeline)
 │   │   │   ├── layout.tsx
-│   │   │   ├── create/           # Create → Responses → Chat
-│   │   │   └── evaluate/         # Evaluate content
+│   │   │   ├── page.tsx          # Mounts the engine, loads/saves the workspace
+│   │   │   └── engine/           # atomPipeline.js (ported prototype) + scoped CSS
 │   │   └── report-generation/
 │   │       ├── layout.tsx        # Sidebar: Home, Content, Reports, People
 │   │       ├── home/page.tsx
@@ -380,7 +381,7 @@ Some components call `API_BASE_URL_WITH_API` directly (e.g., People page, assess
 | **Participant takes case study** | Dashboard → Start → case-study | Overview → Scenario → Task → Review → Submit |
 | **Participant takes inbox activity** | Dashboard → Start → inbox | Overview → Scenario → Gmail Inbox → Task → Org Chart → Submit |
 | **Assessor evaluates** | Assess → Select participant | Score page → Submit scores |
-| **AI Trainer** | Dashboard → AI for Trainers | Create → Responses → Chat (external API) |
+| **AI Trainer** | Dashboard → AI for Trainers | Create → Review → Library → Build → Path; Player; autosaved to backend |
 
 ---
 
