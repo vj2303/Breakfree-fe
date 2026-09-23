@@ -659,10 +659,13 @@ export function mountAtomPipeline(mountEl, opts){
      ============================================================ */
 
   async function handleFiles(fileList){
+    // Snapshot the FileList before the first await: the change handler clears
+    // the input's value as soon as this returns, which empties the live list.
+    const incoming = Array.from(fileList);
     try{ await ensureParsers(); }
     catch(err){ app.error = err.message; render(); return; }
     const jobs = [];
-    for(const file of fileList){
+    for(const file of incoming){
       const ext = (file.name.match(/\.(\w+)$/) || [,''])[1].toLowerCase();
       const kindMap = { pptx:'pptx', pdf:'pdf', docx:'docx', xlsx:'xlsx' };
       const kind = kindMap[ext];
