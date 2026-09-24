@@ -5,6 +5,7 @@ import { Loader2, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { downloadParticipantReportPdf } from '@/lib/reports/participantReportPdf';
+import { aiScoringApi, type AiSuggestion } from '@/lib/aiScoringApi';
 
 import {
   NUMERIC_SCORE_COMMENT_KEY,
@@ -116,6 +117,12 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
   const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [assessmentCenterId, setAssessmentCenterId] = useState<string | null>(null);
+  // AI scoring: `activityId -> "competencyId::subCompetency" -> suggestion`.
+  const [aiSuggestions, setAiSuggestions] = useState<Record<string, Record<string, AiSuggestion>>>({});
+  const [aiDismissed, setAiDismissed] = useState<Record<string, boolean>>({});
+  const [aiRunning, setAiRunning] = useState(false);
+  const [aiWarnings, setAiWarnings] = useState<string[]>([]);
+  const [aiError, setAiError] = useState<string | null>(null);
   const [descriptors, setDescriptors] = useState<Record<string, Record<string, Record<string, Record<string, string>>>>>({}); // activityId -> competencyId -> subCompetency -> scoreKey -> description
   // activityId -> competencies toggled for that activity in the assessment-center config.
   // Lets the UI render all selected competencies even when rubric descriptors for some competencies are missing.
@@ -354,6 +361,77 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
     return own && typeof own === 'object' ? (own as Record<string, string>) : {};
   };
 
+  // ---- AI-assisted scoring -------------------------------------------------
+  // The model proposes a level per sub-competency; nothing is scored until the
+  // assessor presses "Use this".
+  const aiKey = (competencyId: string, subComp: string) => `${competencyId}::${subComp}`;
+
+  const aiSuggestionFor = (activityId: string, competencyId: string, subComp: string): AiSuggestion | null => {
+    const key = aiKey(competencyId, subComp);
+    if (aiDismissed[`${activityId}::${key}`]) return null;
+    return aiSuggestions[activityId]?.[key] ?? null;
+  };
+
+  const storeSuggestions = (activityId: string, list: AiSuggestion[]) => {
+    setAiSuggestions(prev => ({
+      ...prev,
+      [activityId]: list.reduce<Record<string, AiSuggestion>>((acc, item) => {
+        acc[aiKey(item.competencyId, item.subCompetency)] = item;
+        return acc;
+      }, {}),
+    }));
+  };
+
+  const loadAiSuggestions = async (activityId: string) => {
+    if (!token || !participantId || !activityId) return;
+    try {
+      storeSuggestions(activityId, await aiScoringApi.list(token, participantId, activityId));
+    } catch {
+      // Nothing stored yet, or the endpoint is unavailable — the button still works.
+    }
+  };
+
+  const runAiSuggestions = async (activityId: string) => {
+    if (!token || !participantId || !assessmentCenterId || !activityId) return;
+    setAiRunning(true);
+    setAiError(null);
+    setAiWarnings([]);
+    try {
+      const result = await aiScoringApi.suggest(token, {
+        participantId,
+        assessmentCenterId,
+        activityId,
+      });
+      storeSuggestions(activityId, result.suggestions);
+      setAiWarnings(result.warnings || []);
+      // A fresh run replaces earlier dismissals for this activity.
+      setAiDismissed(prev => {
+        const next = { ...prev };
+        Object.keys(next).forEach(k => {
+          if (k.startsWith(`${activityId}::`)) delete next[k];
+        });
+        return next;
+      });
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Could not generate suggestions');
+    } finally {
+      setAiRunning(false);
+    }
+  };
+
+  /** Tells the backend what the assessor settled on, for AI-vs-assessor agreement. */
+  const recordAiOutcome = async (activityId: string) => {
+    if (!token || !participantId || !activityId) return;
+    const selected = activitySelectedScoreKeys[activityId];
+    if (!selected || Object.keys(selected).length === 0) return;
+    if (!aiSuggestions[activityId] || Object.keys(aiSuggestions[activityId]).length === 0) return;
+    try {
+      await aiScoringApi.recordOutcome(token, { participantId, activityId, selectedScoreKeys: selected });
+    } catch {
+      // Analytics only — never block a score submission on it.
+    }
+  };
+
   const getFirstActivityIdWithRubric = (
     assignment: NonNullable<ParticipantDetails['data']['assignments'][number]>,
     competencyId: string,
@@ -365,6 +443,14 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
     }
     return null;
   };
+
+  // Pull any previously generated suggestions for the activity in view, so a
+  // reload does not cost another model run.
+  useEffect(() => {
+    if (!selectedActivityId) return;
+    loadAiSuggestions(selectedActivityId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedActivityId, participantId, token]);
 
   // Initialize competency scores when participant details are loaded
   useEffect(() => {
@@ -831,6 +917,11 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
       console.log('API response after score submission:', result);
 
       if (result.success) {
+        // Record what the assessor settled on against any AI suggestion, so
+        // agreement can be measured later. Never blocks the submission.
+        await Promise.all(
+          Object.keys(aiSuggestions).map(activityId => recordAiOutcome(activityId))
+        );
         setScoreStatus(prev => ({ ...prev, [assignmentId]: status }));
         alert(`Scores ${status === 'DRAFT' ? 'saved as draft' : 'submitted'} successfully for ${assignment.assessmentCenter.displayName}!`);
         // Redirect to /assessor/assess after submission
@@ -1420,6 +1511,34 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
 
                   {/* Scoring form */}
                   <div className="flex min-h-[420px] min-w-0 flex-1 flex-col xl:min-h-0">
+                    {selectedActivity && !isScoringDisabled && (
+                      <div className="mb-2 rounded-lg border border-violet-200 bg-white p-2.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-xs text-gray-600">
+                            Let AI read the submission and propose a level for each sub-competency. You decide.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => runAiSuggestions(activityId)}
+                            disabled={aiRunning}
+                            className="rounded-md bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
+                          >
+                            {aiRunning ? 'Reading the submission…' : 'AI suggest scores'}
+                          </button>
+                        </div>
+                        {aiRunning && (
+                          <p className="mt-1.5 text-xs text-gray-500">
+                            This takes around half a minute for a full activity.
+                          </p>
+                        )}
+                        {aiError && <p className="mt-1.5 text-xs font-medium text-red-600">{aiError}</p>}
+                        {aiWarnings.map((warning) => (
+                          <p key={warning} className="mt-1.5 text-xs font-medium text-amber-700">
+                            {warning}
+                          </p>
+                        ))}
+                      </div>
+                    )}
                     {activeCompetency && selectedActivity ? (
                       <ScoringForm
                         competency={activeCompetency}
@@ -1438,6 +1557,16 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
                             activeCompetency.id,
                             sub
                           )
+                        }
+                        aiSuggestionFor={(sub) => aiSuggestionFor(activityId, activeCompetency.id, sub)}
+                        onUseSuggestion={(sub, level, scoreKey) =>
+                          handleSelectLevel(activityId, activeCompetency.id, sub, level, scoreKey)
+                        }
+                        onDismissSuggestion={(sub) =>
+                          setAiDismissed(prev => ({
+                            ...prev,
+                            [`${activityId}::${activeCompetency.id}::${sub}`]: true,
+                          }))
                         }
                         reportDescriptorFor={reportDescriptorFor}
                         onReportDescriptorChange={(sub, text) =>

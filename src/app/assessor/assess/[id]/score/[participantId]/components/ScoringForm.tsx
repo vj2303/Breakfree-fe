@@ -8,7 +8,9 @@ import {
   getCompetencyScoreTotals,
   getSortedScoreKeysFromDescriptions,
   getSubCompetencyScore,
+  parseScoreKeyLevel,
 } from '../lib/rubric';
+import type { AiSuggestion } from '@/lib/aiScoringApi';
 import { formatClock } from '../lib/observations';
 import type { Observation } from '../lib/observations';
 import type { Competency } from '../lib/types';
@@ -33,6 +35,11 @@ export interface ScoringFormProps {
   notes: Record<string, Record<string, string>> | undefined;
   disabled: boolean;
   observationsFor: (subComp: string) => Observation[];
+  /** AI proposal for this sub-competency, or null when there is none. */
+  aiSuggestionFor: (subComp: string) => AiSuggestion | null;
+  /** Applies the AI's level. Nothing is scored until the assessor does this. */
+  onUseSuggestion: (subComp: string, level: number, scoreKey: string) => void;
+  onDismissSuggestion: (subComp: string) => void;
   reportDescriptorFor: (subComp: string) => ReportDescriptorState;
   onReportDescriptorChange: (subComp: string, text: string) => void;
   onReportDescriptorReset: (subComp: string) => void;
@@ -63,6 +70,9 @@ export default function ScoringForm({
   notes,
   disabled,
   observationsFor,
+  aiSuggestionFor,
+  onUseSuggestion,
+  onDismissSuggestion,
   reportDescriptorFor,
   onReportDescriptorChange,
   onReportDescriptorReset,
@@ -154,6 +164,9 @@ export default function ScoringForm({
           });
           const relevantObservations = observationsFor(subComp);
           const reportDescriptor = reportDescriptorFor(subComp);
+          const suggestion = aiSuggestionFor(subComp);
+          const suggestedLevel = suggestion ? parseScoreKeyLevel(suggestion.suggestedScoreKey) : 0;
+          const suggestionApplied = Boolean(suggestion && selectedScoreKey === suggestion.suggestedScoreKey);
 
           return (
             <div
@@ -177,6 +190,60 @@ export default function ScoringForm({
                 <div className="mt-3">
                   <SectionLabel>Behavioural descriptor</SectionLabel>
                   <p className="text-xs leading-relaxed text-gray-600">{behaviouralDescriptor}</p>
+                </div>
+              )}
+
+              {suggestion && scoreKeys.includes(suggestion.suggestedScoreKey) && (
+                <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-violet-900">
+                      AI suggests level {suggestedLevel}
+                      {suggestion.confidence !== null && (
+                        <span className="ml-1 font-normal text-violet-700">
+                          · {Math.round(suggestion.confidence * 100)}% confidence
+                        </span>
+                      )}
+                    </p>
+                    {!disabled && (
+                      <span className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onUseSuggestion(subComp, suggestedLevel, suggestion.suggestedScoreKey)}
+                          disabled={suggestionApplied}
+                          className="rounded-md bg-violet-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-violet-700 disabled:cursor-default disabled:opacity-50"
+                        >
+                          {suggestionApplied ? 'Applied' : 'Use this'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDismissSuggestion(subComp)}
+                          className="text-xs font-medium text-violet-700 underline"
+                        >
+                          Dismiss
+                        </button>
+                      </span>
+                    )}
+                  </div>
+
+                  {suggestion.evidenceQuote && (
+                    <blockquote className="mt-2 border-l-2 border-violet-300 pl-2 text-xs italic leading-relaxed text-gray-700">
+                      &ldquo;{suggestion.evidenceQuote}&rdquo;
+                      {suggestion.evidenceLocation && (
+                        <span className="ml-1 not-italic text-gray-500">— {suggestion.evidenceLocation}</span>
+                      )}
+                    </blockquote>
+                  )}
+                  {suggestion.reasoning && (
+                    <p className="mt-2 text-xs leading-relaxed text-gray-600">{suggestion.reasoning}</p>
+                  )}
+                  {!suggestion.quoteVerified && (
+                    <p className="mt-2 text-xs font-medium text-amber-700">
+                      Couldn&apos;t find this quote in the submission — check it before accepting.
+                    </p>
+                  )}
+                  <p className="mt-2 text-xs text-gray-500">
+                    A suggestion, not a score. You decide the level.
+                  </p>
                 </div>
               )}
 
