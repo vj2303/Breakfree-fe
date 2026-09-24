@@ -683,7 +683,9 @@ const CreateAssessmentCenterContent = ({ editId }: { editId?: string }) => {
         reportTemplateType: formData.reportTemplateType || '', // Template ID (string) - required field
         activities: transformedActivities,
         assignments: formData.assignments || [],
-        descriptors: formData.descriptors || {}, // Include descriptors in payload
+        // Resolve any `activity-<index>` placeholders to real activity ids first,
+        // otherwise the scoring screen cannot match them to an activity.
+        descriptors: normalizeDescriptorKeys(formData.descriptors || {}, activitiesList),
       };
 
       console.log("[Assessment Center] ========== ACTIVITY TRANSFORMATION DEBUG ==========");
@@ -956,9 +958,30 @@ const CreateAssessmentCenter = () => {
 // Only export the default component
 export default CreateAssessmentCenter;
 
-// Helper to get activity ID
+// Helper to get activity ID.
+// Descriptors are keyed by the activity's CONTENT id, because that is what the
+// assessor scoring screen looks them up by (AssessmentActivity.activityId).
+// `activity-<index>` is only a placeholder for an activity with no content
+// picked yet; normalizeDescriptorKeys() resolves those before saving.
 function getActivityId(activity: Activity, index: number): string {
-  return activity.id || `activity-${index}`;
+  return activity.activityContent || activity.id || `activity-${index}`;
+}
+
+const PLACEHOLDER_KEY = /^activity-(\d+)$/;
+
+// The BARS import hands back descriptors keyed positionally. Map those onto the
+// real activity ids so they survive a save and line up with the scoring screen.
+function normalizeDescriptorKeys(descriptors: any, activities: Activity[]): any {
+  if (!descriptors || typeof descriptors !== 'object') return {};
+  const out: Record<string, any> = {};
+  for (const [key, value] of Object.entries<any>(descriptors)) {
+    const placeholder = PLACEHOLDER_KEY.exec(key);
+    const activity = placeholder ? activities[Number(placeholder[1])] : undefined;
+    const resolved = activity ? getActivityId(activity, Number(placeholder![1])) : key;
+    // Merge instead of overwrite: two keys can resolve to the same activity.
+    out[resolved] = { ...(out[resolved] || {}), ...(value || {}) };
+  }
+  return out;
 }
 
 // Helper function to migrate old descriptor format (without activityId) to new format (with activityId)
@@ -968,13 +991,45 @@ function migrateDescriptorsFormat(descriptors: any, activities: Activity[]): any
   if (!descriptors || typeof descriptors !== 'object') {
     return {};
   }
-  
+
+  const activityIds = new Set(activities.map((act, idx) => getActivityId(act, idx)));
+  const keys = Object.keys(descriptors);
+
+  // Positional keys straight from the BARS import — map them to real activities.
+  if (keys.some(k => PLACEHOLDER_KEY.test(k))) {
+    return normalizeDescriptorKeys(descriptors, activities);
+  }
+
+  // Repair shape: every activity's anchors wrapped under one activity id, one
+  // level too deep ({ <activityId>: { "activity-0": { <competencyId>: ... } } }).
+  // An earlier version of this function produced it, and it makes the scoring
+  // screen show whichever nested activity happens to come first.
+  const wrapped = keys.filter(k => Object.keys(descriptors[k] || {}).some(inner => PLACEHOLDER_KEY.test(inner)));
+  if (wrapped.length > 0) {
+    const out: Record<string, any> = {};
+    for (const key of keys) {
+      const node = descriptors[key] || {};
+      if (!wrapped.includes(key)) {
+        out[key] = { ...(out[key] || {}), ...node };
+        continue;
+      }
+      for (const [inner, value] of Object.entries<any>(node)) {
+        const placeholder = PLACEHOLDER_KEY.exec(inner);
+        if (!placeholder) {
+          out[key] = { ...(out[key] || {}), [inner]: value };
+          continue;
+        }
+        const idx = Number(placeholder[1]);
+        const resolved = activities[idx] ? getActivityId(activities[idx], idx) : key;
+        out[resolved] = { ...(out[resolved] || {}), ...(value || {}) };
+      }
+    }
+    return out;
+  }
+
   // Check if it's already in the new format (has activityId as first level key)
-  const firstKey = Object.keys(descriptors)[0];
-  if (firstKey && activities.some(act => {
-    const activityId = act.id || getActivityId(act, activities.indexOf(act));
-    return activityId === firstKey;
-  })) {
+  const firstKey = keys[0];
+  if (firstKey && activityIds.has(firstKey)) {
     // Already in new format
     return descriptors;
   }

@@ -10,6 +10,8 @@ interface Competency {
 
 interface Activity {
   id?: string;
+  /** Id of the selected case study / inbox activity — the descriptor key. */
+  activityContent?: string;
   name?: string;
   type?: string;
   displayName?: string;
@@ -88,9 +90,11 @@ const CompetencyFramework = () => {
     return activity.displayName || activity.name || activity.type || 'Unknown Activity';
   };
 
-  // Helper function to get activity ID
+  // Helper function to get activity ID.
+  // Must match create/page.tsx: descriptors are keyed by the activity's content
+  // id, which is what the assessor scoring screen looks them up by.
   const getActivityId = (activity: Activity, index: number): string => {
-    return activity.id || `activity-${index}`;
+    return activity.activityContent || activity.id || `activity-${index}`;
   };
 
   const [activeTab, setActiveTab] = useState<string>('');

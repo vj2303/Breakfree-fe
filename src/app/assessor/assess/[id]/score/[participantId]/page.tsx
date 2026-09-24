@@ -330,23 +330,9 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
     const activityDescriptors = descriptors[activityId];
     if (activityDescriptors) {
       for (const competency of availableCompetencies) {
-        // Descriptors can be shaped either as:
-        // 1) descriptors[activityId][competencyId]...
-        // 2) descriptors[activityId]["activity-0"][competencyId]...
-        const directHit = activityDescriptors[competency.id];
-
-        const nestedHit =
-          !directHit &&
-          Object.values(activityDescriptors).some((v) => {
-            if (!v || typeof v !== 'object') return false;
-            return Object.prototype.hasOwnProperty.call(v, competency.id);
-          });
-
-        if (directHit || nestedHit) {
-          if (!seen.has(competency.id)) {
-            out.push(competency);
-            seen.add(competency.id);
-          }
+        if (activityDescriptors[competency.id] && !seen.has(competency.id)) {
+          out.push(competency);
+          seen.add(competency.id);
         }
       }
     }
@@ -356,26 +342,16 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
     return fallback ? [fallback] : [];
   };
 
-  // Helper function to get score descriptions for a competency and sub-competency.
-  // The backend descriptors can be nested like:
-  // - descriptors[activityId][competencyId][subCompetency] = { score1..scoreN: string }
-  // - descriptors[activityId]["activity-0"][competencyId][subCompetency] = { score1..scoreN: string }
+  // Score descriptions for one competency/sub-competency of ONE activity:
+  // descriptors[activityId][competencyId][subCompetency] = { score1..scoreN }.
+  // Only this activity's own rubric is ever used. An activity with no rubric
+  // returns {}, which the caller renders as a plain score — never another
+  // exercise's anchors, which is impossible to spot as wrong while scoring.
   const getScoreDescriptions = (activityId: string, competencyId: string, subCompetency: string): Record<string, string> => {
     const activityNode = descriptors[activityId];
     if (!activityNode || typeof activityNode !== 'object') return {};
-
-    // Direct shape: descriptors[activityId][competencyId][subCompetency]
-    const direct = (activityNode as any)[competencyId]?.[subCompetency];
-    if (direct && typeof direct === 'object') return direct as Record<string, string>;
-
-    // Nested shape: descriptors[activityId]["activity-0" | ...][competencyId][subCompetency]
-    for (const v of Object.values(activityNode as any)) {
-      if (!v || typeof v !== 'object') continue;
-      const nested = (v as any)[competencyId]?.[subCompetency];
-      if (nested && typeof nested === 'object') return nested as Record<string, string>;
-    }
-
-    return {};
+    const own = (activityNode as any)[competencyId]?.[subCompetency];
+    return own && typeof own === 'object' ? (own as Record<string, string>) : {};
   };
 
   const getFirstActivityIdWithRubric = (
