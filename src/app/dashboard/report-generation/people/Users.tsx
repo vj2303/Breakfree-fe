@@ -5,7 +5,9 @@ interface Assessor {
   id: string;
   name: string;
   email: string;
-  designation: string;
+  phoneNumber?: string;
+  // Legacy: no longer collected at registration, still set on older records.
+  designation?: string;
   accessLevel: string;
   isActive: boolean;
   createdAt: string;
@@ -36,8 +38,8 @@ const UsersComponent: React.FC = () => {
   const [editingAssessorId, setEditingAssessorId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '',
+    phoneNumber: '',
     email: '',
-    designation: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -101,7 +103,7 @@ const UsersComponent: React.FC = () => {
             'Authorization': `Bearer ${getAuthToken()}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ name: form.name, designation: form.designation }),
+          body: JSON.stringify({ name: form.name, phoneNumber: form.phoneNumber }),
         });
         data = await response.json();
         if (!response.ok || !data.success) {
@@ -122,7 +124,7 @@ const UsersComponent: React.FC = () => {
         }
       }
       setShowModal(false);
-      setForm({ name: '', email: '', designation: '' });
+      setForm({ name: '', phoneNumber: '', email: '' });
       setIsEdit(false);
       setEditingAssessorId(null);
       await fetchAssessors(pagination.currentPage, searchTerm);
@@ -198,9 +200,15 @@ const UsersComponent: React.FC = () => {
     return () => clearTimeout(timeoutId);
   }, [searchTerm, fetchAssessors]);
 
+  // Registration takes exactly these three fields, all required.
+  const isFormValid =
+    form.name.trim().length > 0 &&
+    form.phoneNumber.trim().length >= 7 &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
+
   // Open modal for add
   const openAddModal = () => {
-    setForm({ name: '', email: '', designation: '' });
+    setForm({ name: '', phoneNumber: '', email: '' });
     setIsEdit(false);
     setEditingAssessorId(null);
     setShowModal(true);
@@ -208,7 +216,7 @@ const UsersComponent: React.FC = () => {
 
   // Open modal for edit
   const openEditModal = (assessor: Assessor) => {
-    setForm({ name: assessor.name, email: assessor.email, designation: assessor.designation });
+    setForm({ name: assessor.name, phoneNumber: assessor.phoneNumber || '', email: assessor.email });
     setIsEdit(true);
     setEditingAssessorId(assessor.id);
     setShowModal(true);
@@ -313,8 +321,8 @@ const UsersComponent: React.FC = () => {
                   />
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Phone Number</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">E-mail</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Designation</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Access Level</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Actions</th>
               </tr>
@@ -338,8 +346,8 @@ const UsersComponent: React.FC = () => {
                       />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-black">{assessor.name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-black">{assessor.phoneNumber || '—'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-black">{assessor.email}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-black">{assessor.designation}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-black">{assessor.accessLevel}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex gap-2">
@@ -411,6 +419,17 @@ const UsersComponent: React.FC = () => {
                 />
               </div>
               <div>
+                <label className="block text-sm font-medium mb-1 text-black">Phone Number*</label>
+                <input
+                  className="border w-full p-3 rounded-lg text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter phone number"
+                  type="tel"
+                  value={form.phoneNumber}
+                  onChange={e => setForm({ ...form, phoneNumber: e.target.value })}
+                  disabled={isSubmitting}
+                />
+              </div>
+              <div>
                 <label className="block text-sm font-medium mb-1 text-black">Email*</label>
                 <input
                   className="border w-full p-3 rounded-lg text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -419,16 +438,6 @@ const UsersComponent: React.FC = () => {
                   value={form.email}
                   onChange={e => setForm({ ...form, email: e.target.value })}
                   disabled={isSubmitting || isEdit}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1 text-black">Designation*</label>
-                <input
-                  className="border w-full p-3 rounded-lg text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter designation"
-                  value={form.designation}
-                  onChange={e => setForm({ ...form, designation: e.target.value })}
-                  disabled={isSubmitting}
                 />
               </div>
             </div>
@@ -443,7 +452,7 @@ const UsersComponent: React.FC = () => {
               <button
                 className="bg-gray-800 text-white px-6 py-2 rounded-lg hover:bg-gray-700 disabled:opacity-50"
                 onClick={createOrUpdateAssessor}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !isFormValid}
               >
                 {isSubmitting ? (isEdit ? 'Updating...' : 'Adding...') : (isEdit ? 'Update Assessor' : 'Add Assessor')}
               </button>
