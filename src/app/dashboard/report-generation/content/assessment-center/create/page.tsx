@@ -15,6 +15,7 @@ import type { Activity } from "./context";
 import { useAuth } from "../../../../../../context/AuthContext";
 import { useSearchParams, useRouter } from "next/navigation";
 import { API_BASE_URL_WITH_API } from "../../../../../../lib/apiConfig";
+import { PLACEHOLDER_KEY, descriptorKeyForActivity, normalizeDescriptorKeys } from '@/lib/descriptorKeys';
 
 const stepTitles = [
   "Select Content",
@@ -958,30 +959,10 @@ const CreateAssessmentCenter = () => {
 // Only export the default component
 export default CreateAssessmentCenter;
 
-// Helper to get activity ID.
-// Descriptors are keyed by the activity's CONTENT id, because that is what the
-// assessor scoring screen looks them up by (AssessmentActivity.activityId).
-// `activity-<index>` is only a placeholder for an activity with no content
-// picked yet; normalizeDescriptorKeys() resolves those before saving.
+// Descriptor keys come from the shared helper so the wizard, the BARS import
+// and the assessor scoring screen all agree on them.
 function getActivityId(activity: Activity, index: number): string {
-  return activity.activityContent || activity.id || `activity-${index}`;
-}
-
-const PLACEHOLDER_KEY = /^activity-(\d+)$/;
-
-// The BARS import hands back descriptors keyed positionally. Map those onto the
-// real activity ids so they survive a save and line up with the scoring screen.
-function normalizeDescriptorKeys(descriptors: any, activities: Activity[]): any {
-  if (!descriptors || typeof descriptors !== 'object') return {};
-  const out: Record<string, any> = {};
-  for (const [key, value] of Object.entries<any>(descriptors)) {
-    const placeholder = PLACEHOLDER_KEY.exec(key);
-    const activity = placeholder ? activities[Number(placeholder[1])] : undefined;
-    const resolved = activity ? getActivityId(activity, Number(placeholder![1])) : key;
-    // Merge instead of overwrite: two keys can resolve to the same activity.
-    out[resolved] = { ...(out[resolved] || {}), ...(value || {}) };
-  }
-  return out;
+  return descriptorKeyForActivity(activity, index);
 }
 
 // Helper function to migrate old descriptor format (without activityId) to new format (with activityId)

@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { useAssessmentForm } from './create/context';
 import { useAuth } from '@/context/AuthContext';
 import { API_BASE_URL_WITH_API } from '../../../../../lib/apiConfig';
+import { normalizeDescriptorKeys } from '@/lib/descriptorKeys';
 
 /**
  * Upload panel for the BARS Excel template.
@@ -92,7 +93,16 @@ const BarsImportPanel: React.FC = () => {
     ]);
 
     updateFormData('matrix', data.matrix);
-    updateFormData('descriptors', data.descriptors);
+    // The import keys anchors positionally; the wizard and the scoring screen
+    // key them by the activity's content id. Resolve now, or step 4 shows
+    // "No scores added yet" for every sub-competency.
+    updateFormData(
+      'descriptors',
+      normalizeDescriptorKeys(
+        data.descriptors,
+        data.activities.map(activity => ({ activityContent: activity.activityContent })),
+      ),
+    );
   };
 
   const handleFile = async (file: File) => {

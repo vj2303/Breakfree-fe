@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronDown, Plus, Smile, Trash2, Minus } from 'lucide-react';
 import { useAssessmentForm } from '../create/context';
+import { descriptorKeyForActivity } from '@/lib/descriptorKeys';
 
 interface Competency {
   id: string;
@@ -90,12 +91,9 @@ const CompetencyFramework = () => {
     return activity.displayName || activity.name || activity.type || 'Unknown Activity';
   };
 
-  // Helper function to get activity ID.
-  // Must match create/page.tsx: descriptors are keyed by the activity's content
-  // id, which is what the assessor scoring screen looks them up by.
-  const getActivityId = (activity: Activity, index: number): string => {
-    return activity.activityContent || activity.id || `activity-${index}`;
-  };
+  // Shared with the wizard and the BARS import — see lib/descriptorKeys.
+  const getActivityId = (activity: Activity, index: number): string =>
+    descriptorKeyForActivity(activity, index);
 
   const [activeTab, setActiveTab] = useState<string>('');
   const [expandedCompetencies, setExpandedCompetencies] = useState<{[key: string]: boolean}>({});
