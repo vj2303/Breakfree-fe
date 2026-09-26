@@ -139,7 +139,8 @@ export default function EvidencePanel({
   onMapObservationToActive,
 }: EvidencePanelProps) {
   const viewerRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  // Audio submissions use the same ref: both elements expose pause/currentTime.
+  const videoRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
 
   const [duration, setDuration] = useState(0);
@@ -157,7 +158,12 @@ export default function EvidencePanel({
 
   const isInbox = activityType === 'INBOX_ACTIVITY';
   const active = sorted.find((s) => s.id === activeSubmissionId) ?? sorted[0];
-  const isVideo = !isInbox && active?.submissionType === 'VIDEO' && Boolean(active.fileUrl);
+  // Audio recordings are stored as VIDEO submissions; tell them apart by file
+  // name so an audio file gets an audio player rather than a black rectangle.
+  const isMedia = !isInbox && active?.submissionType === 'VIDEO' && Boolean(active.fileUrl);
+  const isAudio =
+    isMedia && /\.(mp3|m4a|aac|wav|ogg|oga|opus|flac|weba)$/i.test(active?.fileName || '');
+  const isVideo = isMedia && !isAudio;
   const orderedObservations = sortObservations(observations);
 
   const openComposer = useCallback(() => {
@@ -269,20 +275,41 @@ export default function EvidencePanel({
               {active && (
                 <>
                   <div ref={viewerRef} className="overflow-hidden rounded-xl bg-black">
+                    {isAudio && (
+                      <div className="relative bg-white p-4">
+                        <p className="mb-2 text-xs font-medium text-gray-600">
+                          {activityLabel} · audio recording
+                        </p>
+                        <audio
+                          ref={videoRef as React.RefObject<HTMLAudioElement>}
+                          controls
+                          className="w-full"
+                          preload="metadata"
+                          src={active.fileUrl}
+                          onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+                          onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                        >
+                          Your browser does not support the audio tag.
+                        </audio>
+                      </div>
+                    )}
                     {isVideo && (
                       <div className="relative">
                         <p className="pointer-events-none absolute left-3 top-3 z-10 rounded bg-black/50 px-2 py-0.5 text-xs font-medium text-white">
                           {activityLabel}
                         </p>
                         <video
-                          ref={videoRef}
+                          ref={videoRef as React.RefObject<HTMLVideoElement>}
                           controls
                           className="max-h-[min(46vh,360px)] w-full bg-black"
                           preload="metadata"
+                          // Let the browser sniff the format: recordings arrive as
+                          // .webm/.mov as often as .mp4, and a hard-coded type
+                          // stopped those playing.
+                          src={active.fileUrl}
                           onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
                           onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
                         >
-                          <source src={active.fileUrl} type="video/mp4" />
                           Your browser does not support the video tag.
                         </video>
                       </div>

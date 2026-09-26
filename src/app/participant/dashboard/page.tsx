@@ -2,7 +2,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { interactionTypeBadge } from '@/lib/activityTaxonomy';
+import { getActivityTypeLabel, interactionTypeBadge } from '@/lib/activityTaxonomy';
 
 const getInteractiveActivityTypeBadge = (type?: string) => interactionTypeBadge(type);
 
@@ -54,18 +54,10 @@ const AssessmentCard: React.FC<AssessmentCardProps> = ({
     return { width: `${progress}%` };
   };
 
-  const getActivityTypeDisplay = (activityType: string) => {
-    switch (activityType) {
-      case 'INBOX_ACTIVITY':
-        return { name: 'Inbox Activity', color: 'bg-gray-50 text-gray-700 border-gray-300' };
-      case 'CASE_STUDY':
-        return { name: 'Case Study', color: 'bg-gray-50 text-gray-700 border-gray-300' };
-      default:
-        return { name: activityType.replace('_', ' '), color: 'bg-gray-50 text-gray-700 border-gray-300' };
-    }
-  };
-
-  const activityTypeInfo = getActivityTypeDisplay(type);
+  // Name the activity by what it actually is — a role play is stored as
+  // activityType CASE_STUDY with interactiveActivityType ROLEPLAY, so showing
+  // the category alone labelled every interaction activity "Case Study".
+  const activityTypeName = getActivityTypeLabel(type, interactiveActivityType);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm hover:shadow-md transition-all duration-200 hover:border-gray-300">
@@ -73,18 +65,13 @@ const AssessmentCard: React.FC<AssessmentCardProps> = ({
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
             <h3 className="text-base font-semibold text-black">{displayName}</h3>
-            <span className={`px-2 py-0.5 rounded text-xs font-medium border ${
-              type === 'INBOX_ACTIVITY' 
-                ? 'bg-gray-50 text-gray-700 border-gray-300' 
-                : 'bg-gray-50 text-gray-700 border-gray-300'
-            }`}>
-              {activityTypeInfo.name}
+            <span
+              className={`px-2 py-0.5 rounded text-xs font-medium border ${
+                interactiveBadge ? interactiveBadge.color : 'bg-gray-50 text-gray-700 border-gray-300'
+              }`}
+            >
+              {activityTypeName}
             </span>
-            {interactiveBadge && (
-              <span className={`px-2 py-0.5 rounded text-xs font-medium border ${interactiveBadge.color}`}>
-                {interactiveBadge.label}
-              </span>
-            )}
           </div>
           <p className="text-xs text-gray-600">Assigned on {assignedDate}</p>
         </div>

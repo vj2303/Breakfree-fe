@@ -12,7 +12,7 @@ import ScenarioStep from './ScenarioStep';
 import TaskStep from './TaskStep';
 import ReviewStep from './ReviewStep';
 import Timer from '@/components/Timer';
-import { interactionTypeBadge } from '@/lib/activityTaxonomy';
+import { getActivityTypeLabel, interactionTypeBadge } from '@/lib/activityTaxonomy';
 
 const steps = [
   'Overview and Instructions',
@@ -43,7 +43,7 @@ const CaseStudyPageWithSearchParams = () => {
     activityType: string;
     displayOrder: number;
     competency?: { competencyName: string };
-    activityDetail?: { name: string };
+    activityDetail?: { name: string; interactiveActivityType?: string };
     isSubmitted: boolean;
   }>>([]);
 
@@ -100,7 +100,7 @@ const CaseStudyPageWithSearchParams = () => {
           activityType: string;
           displayOrder: number;
           competency?: { competencyName: string };
-          activityDetail?: { name: string };
+          activityDetail?: { name: string; interactiveActivityType?: string };
           isSubmitted: boolean;
         }>);
         
@@ -282,7 +282,10 @@ const CaseStudyPageWithSearchParams = () => {
                 .sort((a, b) => a.displayOrder - b.displayOrder)
                 .map((activity, index) => {
                   const isActive = activity.activityId === activityData?.activityId;
-                  const activityTypeLabel = activity.activityType === 'CASE_STUDY' ? 'Case Study' : 'Inbox Activity';
+                  const activityTypeLabel = getActivityTypeLabel(
+                    activity.activityType,
+                    activity.activityDetail?.interactiveActivityType
+                  );
                   
                   return (
                     <button
