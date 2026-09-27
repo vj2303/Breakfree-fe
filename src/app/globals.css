@@ -133,3 +133,37 @@ body {
   --ap-border: #e9e5dc;
   --ap-ink: #17181c;
 }
+
+/* ---- Printing -------------------------------------------------------------
+   Printing a page (the AI report uses window.print()) otherwise puts the app
+   chrome — navbar, sidebar, action buttons — on the PDF. Anything marked
+   `no-print` or `data-print-hide` is dropped, and the remaining content is
+   released from the app's flex/scroll shell so it can flow across pages. */
+@media print {
+  .no-print,
+  [data-print-hide] {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  /* The app shell constrains height and scrolls; printing needs neither. */
+  [data-print-main],
+  [data-print-main] * {
+    overflow: visible !important;
+  }
+
+  [data-print-main] {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+  }
+
+  @page {
+    margin: 12mm;
+  }
+}

@@ -39,9 +39,12 @@ export default function ReportGenerationLayout({ children }: { children: React.R
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f8fafd] text-black">
-      <Navbar />
+      {/* Chrome is excluded from print — see the print rules in globals.css. */}
+      <div data-print-hide>
+        <Navbar />
+      </div>
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-60 flex-shrink-0 flex-col border-r border-gray-200 bg-white">
+        <aside data-print-hide className="flex w-60 flex-shrink-0 flex-col border-r border-gray-200 bg-white">
           <nav className="flex flex-1 flex-col gap-1 px-3 py-4">
             {NAV_ITEMS.map(({ label, icon: Icon, href, prefix }) => {
               const isActive = prefix ? pathname.startsWith(prefix) : pathname === href;
@@ -76,7 +79,7 @@ export default function ReportGenerationLayout({ children }: { children: React.R
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1">{children}</main>
+        <main data-print-main className="min-w-0 flex-1">{children}</main>
       </div>
     </div>
   );
