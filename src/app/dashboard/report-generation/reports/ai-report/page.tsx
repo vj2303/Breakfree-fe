@@ -66,12 +66,56 @@ interface InputData {
   scoring: Record<string, ScoringEntry>;
   readiness_scores?: Record<string, number>;
 }
+interface EvidenceEntry {
+  assessorName: string;
+  activityName: string;
+  score: number | null;
+  scoreKey: string | null;
+  descriptor: string | null;
+  descriptorEdited: boolean;
+  comments: string[];
+}
+
+interface SubCompetencyEvidence {
+  subCompetency: string;
+  entries: EvidenceEntry[];
+  averageScore: number | null;
+}
+
+interface CompetencyEvidence {
+  competencyId: string;
+  competencyName: string;
+  averageScore: number | null;
+  readiness: number | null;
+  subCompetencies: SubCompetencyEvidence[];
+  observations: Array<{ assessorName: string; activityName: string; text: string }>;
+  assessorComments: string[];
+}
+
+interface AssessorEvidence {
+  competencies: CompetencyEvidence[];
+  overallComments: Array<{ assessorName: string; text: string }>;
+  activityComments: Array<{ assessorName: string; activityName: string; text: string }>;
+  isEmpty: boolean;
+}
+
+interface CompetencyAnalysis {
+  competencyId: string;
+  competencyName: string;
+  analysis: string;
+  aiGenerated: boolean;
+}
+
 interface AIReportData {
   participant: ParticipantInfo;
   assessmentCenter: ACInfo;
   input: InputData;
   report: { profiles: ProfilesData; insights: InsightsData; recommendations: RecsData };
   readinessScores?: Record<string, number> | null;
+  /** What the assessors recorded: descriptors, comments, observations. */
+  assessorEvidence?: AssessorEvidence | null;
+  /** Evidence-grounded paragraph per competency. */
+  competencyAnalyses?: CompetencyAnalysis[] | null;
 }
 
 /* ─── Helpers ───────────────────────────────────────────────────────────── */
@@ -227,6 +271,8 @@ function AIReportPage() {
   if (!data) return null;
 
   const { participant, assessmentCenter, input, report } = data;
+  const evidence = data.assessorEvidence || null;
+  const analysisByCompetency = new Map((data.competencyAnalyses || []).map((a) => [a.competencyId, a]));
   const { profiles, insights, recommendations } = report;
   const acName = assessmentCenter.displayName || assessmentCenter.name;
   const competencies = CompScores({ scoring: input.scoring, readinessScores: data.readinessScores || input.readiness_scores });
@@ -421,6 +467,132 @@ function AIReportPage() {
             </div>
           </div>
         </div>
+
+        {/* ─── ASSESSOR EVIDENCE: descriptors, comments, AI analysis ───── */}
+        {evidence && evidence.competencies.length > 0 && (
+          <div className="page page-break">
+            <div className="page-header">
+              <span>Confidential — {participant.name} | {acName}</span>
+              <span>Assessor evidence</span>
+            </div>
+            <div className="section-title">Competency Analysis &amp; Assessor Evidence</div>
+            <div className="section-line" />
+            <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 20 }}>
+              For each competency: the analysis drawn from the assessors&apos; own ratings and comments, followed by
+              the rating descriptor each assessor selected and everything they wrote.
+            </p>
+
+            {evidence.competencies.map((comp, compIdx) => {
+              const analysis = analysisByCompetency.get(comp.competencyId);
+              const scored = comp.subCompetencies.filter((sub) => sub.entries.length > 0);
+              return (
+                <div key={comp.competencyId} className={compIdx > 0 ? "page-break" : undefined} style={{ marginBottom: 28 }}>
+                  <div className="comp-header">
+                    <span style={{ fontWeight: 700, color: "#1B2B4B" }}>{comp.competencyName.split("\t")[0]}</span>
+                    <span style={{ fontSize: 12, color: "#374151" }}>
+                      {comp.averageScore !== null ? `${comp.averageScore.toFixed(1)}/5` : "not scored"}
+                      {comp.readiness !== null ? ` · readiness ${comp.readiness.toFixed(1)}/5` : ""}
+                    </span>
+                  </div>
+
+                  {analysis && (
+                    <div className="insight-card" style={{ marginTop: 10, marginBottom: 14 }}>
+                      <p style={{ margin: 0, fontSize: 13, lineHeight: 1.65 }}>{analysis.analysis}</p>
+                      {!analysis.aiGenerated && (
+                        <p style={{ margin: "8px 0 0", fontSize: 11, color: "#9ca3af", fontStyle: "italic" }}>
+                          No written assessor evidence was recorded for this competency.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {scored.map((sub) => (
+                    <div key={sub.subCompetency} style={{ marginBottom: 14, paddingLeft: 14, borderLeft: "3px solid #e5e7eb" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 6 }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 700, color: "#374151" }}>
+                          {sub.subCompetency.split("\t")[0]}
+                        </span>
+                        {sub.averageScore !== null && (
+                          <span style={{ fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
+                            {sub.averageScore.toFixed(1)}/5
+                          </span>
+                        )}
+                      </div>
+                      {sub.entries.map((entry, i) => (
+                        <div key={`${entry.assessorName}-${entry.activityName}-${i}`} style={{ marginBottom: 8 }}>
+                          <div style={{ fontSize: 11.5, color: "#6b7280" }}>
+                            {entry.assessorName} · {entry.activityName}
+                            {entry.score !== null ? ` · ${entry.score}/5` : ""}
+                          </div>
+                          {entry.descriptor && (
+                            <div style={{ fontSize: 12.5, color: "#374151", marginTop: 2 }}>
+                              {entry.descriptor}
+                              {entry.descriptorEdited && (
+                                <span style={{ color: "#9ca3af", fontSize: 11 }}> (edited by assessor)</span>
+                              )}
+                            </div>
+                          )}
+                          {entry.comments.map((comment, ci) => (
+                            <div
+                              key={ci}
+                              style={{ fontSize: 12.5, color: "#1B2B4B", marginTop: 4, paddingLeft: 10, borderLeft: "2px solid #2A9D8F" }}
+                            >
+                              {comment}
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+
+                  {comp.observations.length > 0 && (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#1B2B4B", marginBottom: 4 }}>
+                        Observations recorded during the exercises
+                      </div>
+                      {comp.observations.map((o, i) => (
+                        <div key={i} style={{ fontSize: 12.5, color: "#374151", marginBottom: 3 }}>
+                          • {o.text}{" "}
+                          <span style={{ color: "#9ca3af", fontSize: 11 }}>({o.assessorName}, {o.activityName})</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {comp.assessorComments.length > 0 && (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#1B2B4B", marginBottom: 4 }}>
+                        Assessor comments on this competency
+                      </div>
+                      {comp.assessorComments.map((c, i) => (
+                        <div key={i} style={{ fontSize: 12.5, color: "#374151", marginBottom: 3 }}>• {c}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {(evidence.activityComments.length > 0 || evidence.overallComments.length > 0) && (
+              <div className="page-break" style={{ marginTop: 24 }}>
+                <div className="section-title">Assessor Comments</div>
+                <div className="section-line orange-line" />
+                {evidence.activityComments.map((c, i) => (
+                  <div key={`act-${i}`} style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 11.5, color: "#6b7280" }}>{c.assessorName} · {c.activityName}</div>
+                    <div style={{ fontSize: 13, color: "#374151" }}>{c.text}</div>
+                  </div>
+                ))}
+                {evidence.overallComments.map((c, i) => (
+                  <div key={`ovr-${i}`} style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 11.5, color: "#6b7280" }}>{c.assessorName} · overall</div>
+                    <div style={{ fontSize: 13, color: "#374151" }}>{c.text}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ─── PAGE 4-5: OVERALL STRENGTHS & DEVELOPMENT ─────────────── */}
         <div className="page page-break">

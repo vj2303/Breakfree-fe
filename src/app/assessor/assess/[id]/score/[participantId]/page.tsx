@@ -361,6 +361,31 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
     return own && typeof own === 'object' ? (own as Record<string, string>) : {};
   };
 
+  /**
+   * `{activityId: {competencyId: {subCompetency: {text, include, edited}}}}`
+   * for saving. Only entries the assessor touched are stored; the rest can be
+   * rebuilt from the rubric level they selected.
+   */
+  const buildReportDescriptorsForSave = () => {
+    const out: Record<string, Record<string, Record<string, { text: string; include: boolean; edited: boolean }>>> = {};
+    Object.entries(reportDescriptors).forEach(([key, value]) => {
+      if (!value) return;
+      // Keys are `activityId|competencyId|subCompetency`; the sub-competency
+      // is the remainder, since its text can contain separators.
+      const [activityId, competencyId, ...rest] = key.split('|');
+      const subCompetency = rest.join('|');
+      if (!activityId || !competencyId || !subCompetency) return;
+      out[activityId] = out[activityId] || {};
+      out[activityId][competencyId] = out[activityId][competencyId] || {};
+      out[activityId][competencyId][subCompetency] = {
+        text: value.text ?? '',
+        include: value.include !== false,
+        edited: !!value.edited,
+      };
+    });
+    return out;
+  };
+
   // ---- AI-assisted scoring -------------------------------------------------
   // The model proposes a level per sub-competency; nothing is scored until the
   // assessor presses "Use this".
@@ -895,6 +920,11 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
         assignmentSubCompetencyComments: assignmentSubCompComments[assignmentId] || {},
         overallComments: comments[assignmentId] || '',
         competencyAverages: competencyAverages, // Include competency-level averages
+        // Descriptors as the assessor left them (edited wording included) and
+        // the notes they captured, so the report can quote the assessor rather
+        // than only the rubric's stock text. Both used to be lost on close.
+        reportDescriptors: buildReportDescriptorsForSave(),
+        observations,
         activitySelectedScoreKeys: activitySelectedScoreKeys, // Include selected tick marks for activities
         assignmentSelectedScoreKeys: assignmentSelectedScoreKeys[assignmentId] || {}, // Include selected tick marks for assignment
         editReason: editMode ? editReason : undefined, // Include edit reason if in edit mode
