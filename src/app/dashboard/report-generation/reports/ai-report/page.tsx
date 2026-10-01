@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { API_V1_BASE_URL } from "@/lib/apiConfig";
+import ReportDocument from "@/components/reports/participantReport/ReportDocument";
+import type { ReportView } from "@/components/reports/participantReport/types";
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
 
@@ -116,6 +118,8 @@ interface AIReportData {
   assessorEvidence?: AssessorEvidence | null;
   /** Evidence-grounded paragraph per competency. */
   competencyAnalyses?: CompetencyAnalysis[] | null;
+  /** The document view model — drives the Breakfree report layout. */
+  reportView?: ReportView | null;
 }
 
 /* ─── Helpers ───────────────────────────────────────────────────────────── */
@@ -269,6 +273,35 @@ function AIReportPage() {
   }
 
   if (!data) return null;
+
+  // The Breakfree report layout, driven by the assessment centre's saved
+  // Report Structure. Older responses without a view model fall back to the
+  // previous layout below.
+  if (data.reportView) {
+    return (
+      <>
+        <div className="no-print" style={{ position: "fixed", top: 16, right: 16, zIndex: 100, display: "flex", gap: 8 }}>
+          <button
+            onClick={() => window.print()}
+            style={{ padding: "10px 20px", background: "#1B2B4B", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}
+          >
+            Download PDF (Print)
+          </button>
+          <button
+            onClick={() => window.close()}
+            style={{ padding: "10px 20px", background: "#fff", color: "#1B2B4B", border: "1px solid #d1d5db", borderRadius: 8, cursor: "pointer", fontSize: 13 }}
+          >
+            Close
+          </button>
+        </div>
+        <ReportDocument
+          participant={data.participant}
+          centreName={data.assessmentCenter.displayName || data.assessmentCenter.name}
+          view={data.reportView}
+        />
+      </>
+    );
+  }
 
   const { participant, assessmentCenter, input, report } = data;
   const evidence = data.assessorEvidence || null;
