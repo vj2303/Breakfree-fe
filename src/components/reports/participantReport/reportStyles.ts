@@ -73,6 +73,10 @@ export const REPORT_CSS = `
   }
   /* Screen only: the running footer is a print device. */
   .report-root .running-footer { display: none; }
+  /* The print frame must not alter the on-screen layout. */
+  .report-root .print-frame { width: 100%; border-collapse: collapse; }
+  .report-root .print-frame > tfoot { display: none; }
+  .report-root .print-frame > tbody > tr > td { padding: 0; }
   .report-root .sheet-footer {
     position: absolute;
     left: 52px;
@@ -171,13 +175,20 @@ export const REPORT_CSS = `
   @media print {
     /* Scaled slightly so each section lands on a single sheet. Cheaper than
        shrinking every type size by hand, and it keeps the proportions. */
-    .report-root { max-width: none; zoom: 0.92; }
+    .report-root { max-width: none; zoom: 0.88; }
+    /* Browsers drop background colours when printing unless asked not to.
+       Without this the score bars, band chips and callout tints print blank. */
+    .report-root,
+    .report-root * {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
     /* A4 (297mm) less the 12mm page margins, with room for the footer. The
        sheet is sized to the printable area so the footer lands at the bottom
        of its own page instead of being pushed onto the next one. */
     .report-root .sheet {
       position: relative;
-      min-height: 278mm;   /* printable height ÷ the zoom above */
+      min-height: 272mm;   /* printable height ÷ the zoom above */
       padding: 0 0 14mm;
     }
     .report-root .sheet + .sheet { page-break-before: always; }
@@ -186,19 +197,18 @@ export const REPORT_CSS = `
        Per-sheet footers are hidden: a section that runs to two pages would
        otherwise strand its footer halfway down the second one. */
     .report-root .sheet-footer { display: none; }
+    .report-root .print-frame > tfoot { display: table-footer-group; }
     .report-root .running-footer {
       display: block;
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
       font-size: 9.5px;
       color: #9aa6b2;
       border-top: 1px solid ${LINE};
       padding-top: 6px;
     }
-    /* A heading should never be the last thing on a page. */
+    /* A heading should never be the last thing on a page, and a
+       sub-competency's evidence should not be split across two. */
     .report-root h3.block-head { page-break-after: avoid; break-after: avoid; }
+    .report-root .evidence-group { page-break-inside: avoid; break-inside: avoid; }
     .report-root table.matrix tr { page-break-inside: avoid; break-inside: avoid; }
   }
 `;

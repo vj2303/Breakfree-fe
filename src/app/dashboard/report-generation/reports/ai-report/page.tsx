@@ -280,19 +280,26 @@ function AIReportPage() {
   if (data.reportView) {
     return (
       <>
-        <div className="no-print" style={{ position: "fixed", top: 16, right: 16, zIndex: 100, display: "flex", gap: 8 }}>
-          <button
-            onClick={() => window.print()}
-            style={{ padding: "10px 20px", background: "#1B2B4B", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}
-          >
-            Download PDF (Print)
-          </button>
-          <button
-            onClick={() => window.close()}
-            style={{ padding: "10px 20px", background: "#fff", color: "#1B2B4B", border: "1px solid #d1d5db", borderRadius: 8, cursor: "pointer", fontSize: 13 }}
-          >
-            Close
-          </button>
+        <div className="no-print" style={{ position: "fixed", top: 16, right: 16, zIndex: 100, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => window.print()}
+              style={{ padding: "10px 20px", background: "#1B2B4B", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}
+            >
+              Download PDF (Print)
+            </button>
+            <button
+              onClick={() => window.close()}
+              style={{ padding: "10px 20px", background: "#fff", color: "#1B2B4B", border: "1px solid #d1d5db", borderRadius: 8, cursor: "pointer", fontSize: 13 }}
+            >
+              Close
+            </button>
+          </div>
+          {/* The browser's own date / URL / page-number strip is a print-dialog
+              setting; it cannot be switched off from the page. */}
+          <div style={{ maxWidth: 260, padding: "8px 12px", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 11.5, lineHeight: 1.5, color: "#6b7280", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
+            In the print dialog choose <strong style={{ color: "#1B2B4B" }}>Save as PDF</strong>, set margins to <strong style={{ color: "#1B2B4B" }}>Default</strong>, and under “More settings” untick <strong style={{ color: "#1B2B4B" }}>Headers and footers</strong>.
+          </div>
         </div>
         <ReportDocument
           participant={data.participant}

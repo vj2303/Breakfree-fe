@@ -163,7 +163,8 @@ body {
     min-width: 0 !important;
   }
 
+  /* The deeper bottom margin is where the report's running footer sits. */
   @page {
-    margin: 12mm;
+    margin: 12mm 12mm 20mm;
   }
 }

@@ -537,7 +537,7 @@ function EvidenceRows({ sub, exerciseLabel }: { sub: SubCompetencyView; exercise
   const rows = [sub.highest, sub.lowest].filter(Boolean) as NonNullable<SubCompetencyView['highest']>[];
   if (rows.length === 0) return null;
   return (
-    <div style={{ marginBottom: 10 }}>
+    <div className="evidence-group" style={{ marginBottom: 10 }}>
       <div style={{ fontSize: 11.5, fontWeight: 700, color: NAVY, marginBottom: 4 }}>{sub.name}</div>
       {rows.map((row, i) => (
         <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 4 }}>
@@ -1010,81 +1010,97 @@ export default function ReportDocument({
     <div className="report-root">
       <style>{REPORT_CSS}</style>
 
-      <div className="running-footer">
-        Confidential — {participant.name} | {centreName}
-      </div>
+      {/* The sections sit inside a table so that, when printing, the browser
+          repeats the footer on every page *and* reserves room for it. A fixed
+          footer is simply painted over whatever reaches the foot of a page. */}
+      <table className="print-frame">
+        <tfoot>
+          <tr>
+            <td>
+              <div className="running-footer">
+                Confidential — {participant.name} | {centreName}
+              </div>
+            </td>
+          </tr>
+        </tfoot>
+        <tbody>
+          <tr>
+            <td>
+              <Cover participant={participant} centreName={centreName} view={view} />
 
-      <Cover participant={participant} centreName={centreName} view={view} />
+              <Snapshot
+                participant={participant}
+                centreName={centreName}
+                view={view}
+                page={++page}
+                showChart={showChart}
+                showStrengths={showStrengths}
+                showDevelopment={showDevelopment}
+              />
 
-      <Snapshot
-        participant={participant}
-        centreName={centreName}
-        view={view}
-        page={++page}
-        showChart={showChart}
-        showStrengths={showStrengths}
-        showDevelopment={showDevelopment}
-      />
+              {showIntro && (
+                <HowToRead
+                  participant={participant}
+                  centreName={centreName}
+                  view={view}
+                  page={++page}
+                  showScale={showScale}
+                  showReadiness={showReadiness}
+                />
+              )}
 
-      {showIntro && (
-        <HowToRead
-          participant={participant}
-          centreName={centreName}
-          view={view}
-          page={++page}
-          showScale={showScale}
-          showReadiness={showReadiness}
-        />
-      )}
+              {showMatrix && (
+                <Matrix participant={participant} centreName={centreName} view={view} page={++page} />
+              )}
 
-      {showMatrix && (
-        <Matrix participant={participant} centreName={centreName} view={view} page={++page} />
-      )}
+              {showDetail &&
+                view.competencies.map((competency) => (
+                  <CompetencyDetail
+                    key={competency.competencyId}
+                    participant={participant}
+                    centreName={centreName}
+                    competency={competency}
+                    copy={copyById.get(competency.competencyId)}
+                    page={++page}
+                    showStrengths={showStrengths}
+                    showDevelopment={showDevelopment}
+                    showEvidence
+                    showReadiness={showReadiness}
+                    exerciseLabel={exerciseLabel}
+                  />
+                ))}
 
-      {showDetail &&
-        view.competencies.map((competency) => (
-          <CompetencyDetail
-            key={competency.competencyId}
-            participant={participant}
-            centreName={centreName}
-            competency={competency}
-            copy={copyById.get(competency.competencyId)}
-            page={++page}
-            showStrengths={showStrengths}
-            showDevelopment={showDevelopment}
-            showEvidence
-            showReadiness={showReadiness}
-            exerciseLabel={exerciseLabel}
-          />
-        ))}
+              {showReadiness && (
+                <ReadinessVsApplication
+                  participant={participant}
+                  centreName={centreName}
+                  view={view}
+                  page={++page}
+                />
+              )}
 
-      {showReadiness && (
-        <ReadinessVsApplication
-          participant={participant}
-          centreName={centreName}
-          view={view}
-          page={++page}
-        />
-      )}
+              {showRecommendation && view.developmentPlan && view.developmentPlan.blocks.length > 0 && (
+                <DevelopmentPlanSection
+                  participant={participant}
+                  centreName={centreName}
+                  plan={view.developmentPlan}
+                  page={++page}
+                />
+              )}
 
-      {showRecommendation && view.developmentPlan && view.developmentPlan.blocks.length > 0 && (
-        <DevelopmentPlanSection
-          participant={participant}
-          centreName={centreName}
-          plan={view.developmentPlan}
-          page={++page}
-        />
-      )}
-
-      {view.appendix && view.appendix.length > 0 && (
-        <Appendix
-          participant={participant}
-          centreName={centreName}
-          appendix={view.appendix}
-          exerciseLabel={exerciseLabel}
-          page={++page}
-        />
-      )}
+              {view.appendix && view.appendix.length > 0 && (
+                <Appendix
+                  participant={participant}
+                  centreName={centreName}
+                  appendix={view.appendix}
+                  exerciseLabel={exerciseLabel}
+                  page={++page}
+                />
+              )}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 }
