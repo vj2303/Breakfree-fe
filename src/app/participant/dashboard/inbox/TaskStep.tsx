@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { InboxActivityData, EmailContent } from './types';
 import RichTextEditor from '@/components/RichTextEditor';
+import {
+  DOCUMENT_IMAGE_ACCEPT,
+  DOCUMENT_IMAGE_TYPES_LABEL,
+  MAX_UPLOAD_LABEL,
+  checkUploadSize,
+  formatFileSize,
+} from '@/lib/uploadLimits';
 
 interface TaskStepProps {
   activityData?: InboxActivityData;
@@ -28,6 +35,7 @@ const TaskStep: React.FC<TaskStepProps> = ({
   onSubmit 
 }) => {
   const [fileInputKey, setFileInputKey] = useState(0);
+  const [fileError, setFileError] = useState<string | null>(null);
   const [emailContent, setEmailContent] = useState('');
   const [replyTo, setReplyTo] = useState('');
   const [replySubject, setReplySubject] = useState('');
@@ -81,16 +89,26 @@ const TaskStep: React.FC<TaskStepProps> = ({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setSubmissionData({
-        ...submissionData,
-        file,
-        submissionType: file.type.startsWith('video/') ? 'VIDEO' : 'DOCUMENT'
-      });
+    if (!file) return;
+
+    // Caught here so an oversized attachment fails instantly, not after upload.
+    const sizeError = checkUploadSize(file);
+    if (sizeError) {
+      setFileError(sizeError);
+      setFileInputKey((prev) => prev + 1);
+      return;
     }
+
+    setFileError(null);
+    setSubmissionData({
+      ...submissionData,
+      file,
+      submissionType: file.type.startsWith('video/') ? 'VIDEO' : 'DOCUMENT'
+    });
   };
 
   const removeFile = () => {
+    setFileError(null);
     setSubmissionData({
       ...submissionData,
       file: undefined,
@@ -259,7 +277,7 @@ const TaskStep: React.FC<TaskStepProps> = ({
               <input
                 key={fileInputKey}
                 type="file"
-                accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.jpg,.jpeg,.png"
+                accept={DOCUMENT_IMAGE_ACCEPT}
                 onChange={handleFileChange}
                 className="hidden"
                 id="file-upload"
@@ -274,11 +292,19 @@ const TaskStep: React.FC<TaskStepProps> = ({
                 </svg>
                 <span className="text-xs text-gray-600">
                   {submissionData.file ? submissionData.file.name : 'Click to upload document'}
+                  <span className="ml-2 text-gray-500">
+                    {DOCUMENT_IMAGE_TYPES_LABEL} · up to {MAX_UPLOAD_LABEL}
+                  </span>
                 </span>
               </label>
+
+              {fileError && <p className="mt-2 text-xs font-medium text-red-600">{fileError}</p>}
               {submissionData.file && (
                 <div className="mt-2 flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-200">
-                  <span className="text-xs text-gray-700">{submissionData.file.name}</span>
+                  <span className="text-xs text-gray-700">
+                    {submissionData.file.name}
+                    <span className="ml-2 text-gray-500">{formatFileSize(submissionData.file.size)}</span>
+                  </span>
                   <button
                     onClick={removeFile}
                     className="text-red-600 hover:text-red-800 text-xs font-medium"

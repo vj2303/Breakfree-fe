@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
 import { ActivityData, Task } from './types';
+import {
+  DOCUMENT_ACCEPT,
+  DOCUMENT_TYPES_LABEL,
+  MAX_UPLOAD_LABEL,
+  MEDIA_ACCEPT,
+  MEDIA_TYPES_LABEL,
+  checkUploadSize,
+  formatFileSize,
+} from '@/lib/uploadLimits';
 
 interface TaskStepProps {
   activityData?: ActivityData;
@@ -19,6 +28,7 @@ interface TaskStepProps {
 
 const TaskStep: React.FC<TaskStepProps> = ({ activityData, submissionData, setSubmissionData }) => {
   const [fileInputKey, setFileInputKey] = useState(0);
+  const [fileError, setFileError] = useState<string | null>(null);
 
   // Recordings can be video or audio; some browsers report no type at all for
   // .mov/.webm/.m4a, so fall back to the extension.
@@ -28,16 +38,26 @@ const TaskStep: React.FC<TaskStepProps> = ({ activityData, submissionData, setSu
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setSubmissionData({
-        ...submissionData,
-        file,
-        submissionType: isMediaFile(file) ? 'VIDEO' : 'DOCUMENT'
-      });
+    if (!file) return;
+
+    // Refuse an oversized file here rather than after a long upload.
+    const sizeError = checkUploadSize(file);
+    if (sizeError) {
+      setFileError(sizeError);
+      setFileInputKey((prev) => prev + 1);
+      return;
     }
+
+    setFileError(null);
+    setSubmissionData({
+      ...submissionData,
+      file,
+      submissionType: isMediaFile(file) ? 'VIDEO' : 'DOCUMENT'
+    });
   };
 
   const removeFile = () => {
+    setFileError(null);
     setSubmissionData({
       ...submissionData,
       file: undefined,
@@ -145,11 +165,7 @@ const TaskStep: React.FC<TaskStepProps> = ({ activityData, submissionData, setSu
                 <input
                   key={fileInputKey}
                   type="file"
-                  accept={
-                    submissionData.submissionType === 'VIDEO'
-                      ? 'video/*,audio/*,.mov,.m4a,.webm'
-                      : '.pdf,.doc,.docx,.ppt,.pptx,.txt'
-                  }
+                  accept={submissionData.submissionType === 'VIDEO' ? MEDIA_ACCEPT : DOCUMENT_ACCEPT}
                   onChange={handleFileChange}
                   className="hidden"
                   id="file-upload"
@@ -164,11 +180,22 @@ const TaskStep: React.FC<TaskStepProps> = ({ activityData, submissionData, setSu
                   <p className="mt-1.5 text-xs text-gray-600">
                     Click to upload {submissionData.submissionType === 'VIDEO' ? 'a video or audio recording' : 'document'}
                   </p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {submissionData.submissionType === 'VIDEO' ? MEDIA_TYPES_LABEL : DOCUMENT_TYPES_LABEL}
+                    {' · up to '}{MAX_UPLOAD_LABEL}
+                  </p>
                 </label>
               </div>
+
+              {fileError && (
+                <p className="mt-2 text-xs font-medium text-red-600">{fileError}</p>
+              )}
               {submissionData.file && (
                 <div className="mt-2 flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-200">
-                  <span className="text-xs text-gray-700">{submissionData.file.name}</span>
+                  <span className="text-xs text-gray-700">
+                    {submissionData.file.name}
+                    <span className="ml-2 text-gray-500">{formatFileSize(submissionData.file.size)}</span>
+                  </span>
                   <button
                     onClick={removeFile}
                     className="text-red-600 hover:text-red-800 text-xs"
