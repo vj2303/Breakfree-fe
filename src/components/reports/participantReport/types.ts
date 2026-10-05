@@ -37,6 +37,8 @@ export interface CompetencyView {
   band: Band | null;
   readiness: number | null;
   alignment: Alignment | null;
+  gap: number | null;
+  implication: string;
   subCompetencies: SubCompetencyView[];
 }
 
@@ -85,6 +87,50 @@ export interface ReportStructureFlags {
   recommendation: boolean;
 }
 
+export interface DevelopmentBlock {
+  subCompetency: string;
+  competencyName: string;
+  score: number | null;
+  priority: Priority;
+  readinessLabel: string | null;
+  whatToWorkOn: string;
+  onTheJob: string[];
+  coaching: string;
+  formalLearning: string;
+}
+
+export interface DevelopmentPlan {
+  blocks: DevelopmentBlock[];
+  leverageStrengths: Array<{ from: string; to: string; text: string }>;
+  firstThirtyDays: string[];
+  readinessNarrative: string;
+}
+
+/** One assessor's rating of one sub-competency in one exercise. */
+export interface AppendixEntry {
+  assessorName: string;
+  activityId: string | null;
+  activityName: string;
+  score: number | null;
+  scoreKey: string | null;
+  descriptor: string | null;
+  descriptorEdited: boolean;
+  comments: string[];
+}
+
+export interface AppendixSubCompetency {
+  subCompetency: string;
+  averageScore: number | null;
+  entries: AppendixEntry[];
+}
+
+export interface AppendixCompetency {
+  competencyId: string;
+  competencyName: string;
+  averageScore: number | null;
+  subCompetencies: AppendixSubCompetency[];
+}
+
 export interface ReportView {
   structure: ReportStructureFlags | null;
   meta: { assessmentDate: string | null; reportDate: string };
@@ -96,6 +142,8 @@ export interface ReportView {
   matrixPattern: string;
   subCompetencyOneLiners: Record<string, string>;
   competencyCopy: CompetencyCopy[];
+  developmentPlan?: DevelopmentPlan | null;
+  appendix?: AppendixCompetency[] | null;
 }
 
 export interface ReportParticipant {

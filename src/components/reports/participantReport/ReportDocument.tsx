@@ -688,6 +688,292 @@ function CompetencyDetail({
   );
 }
 
+/* ─── Readiness vs application ───────────────────────────────────────── */
+
+function ReadinessVsApplication({
+  participant,
+  centreName,
+  view,
+  page,
+}: {
+  participant: ReportParticipant;
+  centreName: string;
+  view: ReportView;
+  page: number;
+}) {
+  const scored = view.competencies.filter((c) => c.readiness !== null);
+  if (scored.length === 0) return null;
+  const barWidth = 330;
+  const signed = (value: number | null) =>
+    value === null ? '–' : `${value > 0 ? '+' : value < 0 ? '−' : ''}${Math.abs(value).toFixed(1)}`;
+
+  return (
+    <section className="sheet page-break">
+      <RunningHead />
+      <h2 className="section-head">Readiness vs application</h2>
+      <p style={{ fontSize: 12.5, color: MUTED, margin: 0 }}>
+        Application = behaviour observed in the exercises. Readiness = situational judgement test (SJT) result. The
+        two are never combined.
+      </p>
+      <div className="rule" />
+
+      <div style={{ marginBottom: 14 }}>
+        {view.competencies.map((c) => (
+          <div key={c.competencyId} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <span style={{ width: 160, fontSize: 12, fontWeight: 600, color: NAVY }}>{c.name}</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                <div style={{ width: barWidth, height: 11, background: '#EEF4F3', borderRadius: 2 }}>
+                  <div style={{ width: `${((c.application ?? 0) / 5) * 100}%`, height: '100%', background: TEAL, borderRadius: 2 }} />
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: NAVY }}>{fmt(c.application)}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: barWidth, height: 11, background: '#EEF1F6', borderRadius: 2 }}>
+                  <div style={{ width: `${((c.readiness ?? 0) / 5) * 100}%`, height: '100%', background: NAVY, borderRadius: 2 }} />
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: NAVY }}>{fmt(c.readiness)}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 16, fontSize: 10.5, color: MUTED, marginBottom: 16 }}>
+        <span><span style={{ display: 'inline-block', width: 14, height: 8, background: TEAL, borderRadius: 2, marginRight: 5 }} />Application</span>
+        <span><span style={{ display: 'inline-block', width: 14, height: 8, background: NAVY, borderRadius: 2, marginRight: 5 }} />Readiness</span>
+      </div>
+
+      <table className="matrix">
+        <thead>
+          <tr>
+            <th className="left">Competency</th>
+            <th>Application</th>
+            <th>Readiness</th>
+            <th>Gap</th>
+            <th>Label</th>
+            <th className="left">Implication</th>
+          </tr>
+        </thead>
+        <tbody>
+          {view.competencies.map((c) => (
+            <tr key={c.competencyId}>
+              <td className="left" style={{ fontWeight: 700, color: NAVY }}>{c.name}</td>
+              <td style={{ fontWeight: 700 }}>{fmt(c.application)}</td>
+              <td style={{ fontWeight: 700 }}>{fmt(c.readiness)}</td>
+              <td style={{ fontWeight: 700 }}>{signed(c.gap)}</td>
+              <td>
+                {c.alignment && (
+                  <span className="pill-outline" style={{ border: `1px solid ${ALIGNMENT_STYLE[c.alignment].border}`, color: NAVY }}>
+                    {c.alignment}
+                  </span>
+                )}
+              </td>
+              <td className="left" style={{ fontSize: 10.5, color: MUTED }}>{c.implication}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {view.developmentPlan?.readinessNarrative && (
+        <>
+          <h3 className="block-head" style={{ marginTop: 18 }}>What this means for development</h3>
+          <div className="callout callout-summary">{view.developmentPlan.readinessNarrative}</div>
+        </>
+      )}
+
+      <SheetFooter participantName={participant.name} centreName={centreName} page={page} />
+    </section>
+  );
+}
+
+/* ─── Development plan ───────────────────────────────────────────────── */
+
+function DevelopmentPlanSection({
+  participant,
+  centreName,
+  plan,
+  page,
+}: {
+  participant: ReportParticipant;
+  centreName: string;
+  plan: NonNullable<ReportView['developmentPlan']>;
+  page: number;
+}) {
+  const column = (label: string, children: React.ReactNode) => (
+    <div style={{ flex: 1, borderLeft: `1px solid ${LINE}`, padding: '10px 12px' }}>
+      <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1.2, color: TEAL, marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 11.5, color: INK, lineHeight: 1.55 }}>{children}</div>
+    </div>
+  );
+
+  return (
+    <section className="sheet page-break">
+      <RunningHead />
+      <h2 className="section-head">Development plan</h2>
+      <p style={{ fontSize: 12.5, color: MUTED, margin: 0 }}>
+        One block per development area, ordered by priority. Actions follow the 70-20-10 model: on the job, coaching
+        and feedback, formal learning.
+      </p>
+      <div className="rule" />
+
+      {plan.blocks.map((block) => (
+        <div key={block.subCompetency} className="avoid-break" style={{ border: `1px solid ${LINE}`, borderRadius: 8, marginBottom: 14, overflow: 'hidden' }}>
+          <div style={{ background: '#F8FAFC', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: NAVY }}>{block.subCompetency}</div>
+              <div style={{ fontSize: 11, color: MUTED }}>
+                {block.competencyName}
+                {block.readinessLabel ? ` · Readiness: ${block.readinessLabel}` : ''}
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 18, fontWeight: 700, color: NAVY }}>{fmt(block.score)}</span>
+              <PriorityPill priority={block.priority} />
+            </div>
+          </div>
+
+          {block.whatToWorkOn && (
+            <div style={{ padding: '10px 14px', fontSize: 12, borderBottom: `1px solid ${LINE}` }}>
+              <strong>What to work on:</strong> {block.whatToWorkOn}
+            </div>
+          )}
+
+          <div style={{ display: 'flex' }}>
+            {column(
+              '70% · ON THE JOB',
+              <ul style={{ margin: 0, paddingLeft: 14 }}>
+                {block.onTheJob.map((action, i) => (
+                  <li key={i} style={{ marginBottom: 4 }}>{action}</li>
+                ))}
+              </ul>
+            )}
+            {column('20% · COACHING & FEEDBACK', block.coaching)}
+            {column('10% · FORMAL LEARNING', block.formalLearning)}
+          </div>
+        </div>
+      ))}
+
+      {(plan.leverageStrengths.length > 0 || plan.firstThirtyDays.length > 0) && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 6 }}>
+          {plan.leverageStrengths.length > 0 && (
+            <div className="callout callout-plain avoid-break">
+              <div style={{ fontSize: 13, fontWeight: 700, color: NAVY, marginBottom: 8 }}>Leverage your strengths</div>
+              <ul style={{ margin: 0, paddingLeft: 16 }}>
+                {plan.leverageStrengths.map((item, i) => (
+                  <li key={i} style={{ marginBottom: 6 }}>
+                    <strong>{item.from} → {item.to}.</strong> {item.text}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {plan.firstThirtyDays.length > 0 && (
+            <div className="callout callout-summary avoid-break">
+              <div style={{ fontSize: 13, fontWeight: 700, color: NAVY, marginBottom: 8 }}>First 30 days</div>
+              <ol style={{ margin: 0, paddingLeft: 16 }}>
+                {plan.firstThirtyDays.map((step, i) => (
+                  <li key={i} style={{ marginBottom: 5 }}>{step}</li>
+                ))}
+              </ol>
+            </div>
+          )}
+        </div>
+      )}
+
+      <SheetFooter participantName={participant.name} centreName={centreName} page={page} />
+    </section>
+  );
+}
+
+/* ─── Appendix: every rating an assessor gave ────────────────────────── */
+
+function Appendix({
+  participant,
+  centreName,
+  appendix,
+  exerciseLabel,
+  page,
+}: {
+  participant: ReportParticipant;
+  centreName: string;
+  appendix: NonNullable<ReportView['appendix']>;
+  exerciseLabel: (name: string) => string;
+  page: number;
+}) {
+  const hasUnrated = appendix.some((c) =>
+    c.subCompetencies.some((s) => s.entries.some((e) => e.score === null && e.descriptor))
+  );
+
+  return (
+    <section className="sheet page-break">
+      <RunningHead />
+      <h2 className="section-head">Appendix — Assessor evidence</h2>
+      <p style={{ fontSize: 12.5, color: MUTED, margin: 0 }}>
+        Every rating and BARS descriptor selected, by competency, sub-competency and exercise. This is the audit
+        trail for the report; assessor names and notes appear only here.
+      </p>
+      <div className="rule" />
+
+      <table className="matrix">
+        <thead>
+          <tr>
+            <th className="left" style={{ width: 90 }}>Exercise</th>
+            <th className="left" style={{ width: 90 }}>Assessor</th>
+            <th style={{ width: 56 }}>Rating</th>
+            <th className="left">Behaviour observed (BARS descriptor)</th>
+            <th className="left" style={{ width: 120 }}>Assessor note</th>
+          </tr>
+        </thead>
+        <tbody>
+          {appendix.map((competency) => (
+            <React.Fragment key={competency.competencyId}>
+              <tr>
+                <td className="left" colSpan={5} style={{ background: NAVY, color: '#fff', fontWeight: 700, fontSize: 11.5 }}>
+                  {competency.competencyName.split('\t')[0].split(':')[0]}
+                </td>
+              </tr>
+              {competency.subCompetencies
+                .filter((sub) => sub.entries.length > 0)
+                .map((sub) => (
+                  <React.Fragment key={sub.subCompetency}>
+                    <tr>
+                      <td className="left" colSpan={5} style={{ background: '#EEF2F7', fontWeight: 700, color: NAVY, fontSize: 11 }}>
+                        {sub.subCompetency.split('\t')[0].split(':')[0]}
+                        <span style={{ fontWeight: 400, color: MUTED }}> — {fmt(sub.averageScore)}</span>
+                      </td>
+                    </tr>
+                    {sub.entries.map((entry, i) => (
+                      <tr key={i}>
+                        <td className="left" style={{ fontSize: 10.5 }}>{exerciseLabel(entry.activityName)}</td>
+                        <td className="left" style={{ fontSize: 10.5 }}>{entry.assessorName}</td>
+                        <td style={{ fontWeight: 700, color: entry.score === null ? '#B3443C' : INK, fontSize: 10.5 }}>
+                          {entry.score === null ? 'Not rated' : entry.score}
+                        </td>
+                        <td className="left" style={{ fontSize: 10.5 }}>{entry.descriptor || '—'}</td>
+                        <td className="left" style={{ fontSize: 10, color: '#8A5A12', fontStyle: 'italic' }}>
+                          {entry.comments.join(' ')}
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ))}
+            </React.Fragment>
+          ))}
+        </tbody>
+      </table>
+
+      {hasUnrated && (
+        <p style={{ fontSize: 10, color: MUTED, marginTop: 10 }}>
+          “Not rated”: the assessor selected a descriptor but no rating was recorded. These entries are excluded from
+          all averages.
+        </p>
+      )}
+
+      <SheetFooter participantName={participant.name} centreName={centreName} page={page} />
+    </section>
+  );
+}
+
 /* ─── Document ───────────────────────────────────────────────────────── */
 
 export default function ReportDocument({
@@ -709,6 +995,7 @@ export default function ReportDocument({
   const showStrengths = structure?.comments?.areasOfStrength ?? true;
   const showDevelopment = structure?.comments?.areasOfDevelopment ?? true;
   const showDetail = structure?.analysis?.detailObservation ?? true;
+  const showRecommendation = structure ? structure.recommendation : true;
 
   const copyById = new Map(view.competencyCopy.map((c) => [c.competencyId, c]));
   // Evidence rows name the exercise type, not its full title.
@@ -770,6 +1057,34 @@ export default function ReportDocument({
             exerciseLabel={exerciseLabel}
           />
         ))}
+
+      {showReadiness && (
+        <ReadinessVsApplication
+          participant={participant}
+          centreName={centreName}
+          view={view}
+          page={++page}
+        />
+      )}
+
+      {showRecommendation && view.developmentPlan && view.developmentPlan.blocks.length > 0 && (
+        <DevelopmentPlanSection
+          participant={participant}
+          centreName={centreName}
+          plan={view.developmentPlan}
+          page={++page}
+        />
+      )}
+
+      {view.appendix && view.appendix.length > 0 && (
+        <Appendix
+          participant={participant}
+          centreName={centreName}
+          appendix={view.appendix}
+          exerciseLabel={exerciseLabel}
+          page={++page}
+        />
+      )}
     </div>
   );
 }
