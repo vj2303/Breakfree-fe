@@ -8,7 +8,7 @@ import { useAuth } from '@/context/AuthContext'
 
 export default function ParticipantLogin() {
   const router = useRouter()
-  const { login } = useAuth()
+  const { login, logout } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -38,6 +38,12 @@ export default function ParticipantLogin() {
       })
 
       if (result.success) {
+        if (!result.participantId) {
+          // Valid credentials, wrong door — the dashboard would be empty.
+          setError('This account is not registered as a participant. If you are an assessor, use the assessor login.')
+          logout()
+          return
+        }
         // Redirect to participant dashboard on successful login
         router.push('/participant/dashboard')
       } else {

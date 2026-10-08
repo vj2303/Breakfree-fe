@@ -44,6 +44,13 @@ export default function AssessorLogin() {
         password: formData.password 
       })
       if (result.success) {
+        if (!result.assessorId) {
+          // The credentials are valid, they are just not an assessor's. Say so:
+          // silently clearing the session looks like the button did nothing.
+          setError('This account is not registered as an assessor. If you are a participant, use the participant login.')
+          logout()
+          return
+        }
         router.push('/assessor/dashboard')
       } else {
         setError(result.message || 'Login failed. Please check your credentials.')
@@ -69,9 +76,11 @@ export default function AssessorLogin() {
     }
   }, [user, loading, assessorId, router])
 
-  // If user is logged in but not an assessor, auto-logout so they can log in with assessor credentials
+  // Arrived here already signed in as someone who is not an assessor: sign
+  // them out so assessor credentials can be entered, and say why.
   useEffect(() => {
     if (user && !loading && !assessorId) {
+      setError('This account is not registered as an assessor. If you are a participant, use the participant login.')
       logout()
     }
   }, [user, loading, assessorId, logout])

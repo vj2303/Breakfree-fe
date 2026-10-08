@@ -232,6 +232,9 @@ interface AuthResult {
     refreshToken?: string;
     expiresIn?: number;
   };
+  /** Resolved from the profile, so a caller can tell which side to open. */
+  participantId?: string | null;
+  assessorId?: string | null;
 }
 
 interface AuthContextType {
@@ -689,6 +692,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             message: "Login succeeded but failed to load your profile. Please try again.",
           };
         }
+
+        // Handed back so the login page can check the account is of the kind
+        // that page is for, before navigating.
+        return {
+          ...result,
+          participantId: profile.participantId ?? null,
+          assessorId: profile.assessorId ?? null,
+        };
       }
 
       return result;
