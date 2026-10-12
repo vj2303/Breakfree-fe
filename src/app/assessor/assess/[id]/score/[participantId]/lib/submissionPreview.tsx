@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 
+import { toPlayableUrl } from '@/lib/mediaUrl';
+
 export function getFileExtensionFromNameOrUrl(nameOrUrl: string): string {
   const path = (nameOrUrl.split(/[?#]/)[0] ?? '').trim();
   const dot = path.lastIndexOf('.');
@@ -72,7 +74,10 @@ export function DocumentSubmissionPreview({
   fileSize?: number;
 }) {
   const mode = inferDocumentPreviewMode(fileUrl, fileName);
-  const officeEmbedSrc = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`;
+  // Repaired here as well: a document can reach this component straight from the
+  // API without passing through the evidence panel.
+  const safeUrl = toPlayableUrl(fileUrl);
+  const officeEmbedSrc = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(safeUrl)}`;
 
   return (
     <div className="mt-2 space-y-2">
@@ -83,14 +88,14 @@ export function DocumentSubmissionPreview({
         {mode === 'pdf' && (
           <iframe
             title={fileName || 'Document preview'}
-            src={fileUrl}
+            src={safeUrl}
             className="h-[min(70vh,560px)] w-full border-0 bg-white"
           />
         )}
         {mode === 'image' && (
           // eslint-disable-next-line @next/next/no-img-element -- external participant submission URL
           <img
-            src={fileUrl}
+            src={safeUrl}
             alt={fileName || 'Submission document'}
             className="max-h-[min(70vh,560px)] w-full bg-neutral-100 object-contain"
           />
@@ -102,17 +107,17 @@ export function DocumentSubmissionPreview({
             className="h-[min(70vh,560px)] w-full border-0 bg-white"
           />
         )}
-        {mode === 'text' && <TextSubmissionPreview url={fileUrl} />}
+        {mode === 'text' && <TextSubmissionPreview url={safeUrl} />}
         {mode === 'generic' && (
           <iframe
             title={fileName || 'Document preview'}
-            src={fileUrl}
+            src={safeUrl}
             className="h-[min(70vh,560px)] w-full border-0 bg-white"
           />
         )}
       </div>
       <a
-        href={fileUrl}
+        href={safeUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="flex items-center gap-1.5 text-xs text-gray-700 hover:text-black"

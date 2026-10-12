@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Maximize2, Paperclip, Plus } from 'lucide-react';
 
 import { DocumentSubmissionPreview } from '../lib/submissionPreview';
+import { toPlayableUrl } from '@/lib/mediaUrl';
 import { formatClock, markerColor, sortObservations } from '../lib/observations';
 import type { Observation } from '../lib/observations';
 import type { SubmissionRecord } from '../lib/types';
@@ -145,6 +146,8 @@ export default function EvidencePanel({
 
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
+  /** Set when a video track turns out to be absent, i.e. the file is audio only. */
+  const [audioOnly, setAudioOnly] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [draftTime, setDraftTime] = useState<number | null>(null);
@@ -161,9 +164,13 @@ export default function EvidencePanel({
   // Audio recordings are stored as VIDEO submissions; tell them apart by file
   // name so an audio file gets an audio player rather than a black rectangle.
   const isMedia = !isInbox && active?.submissionType === 'VIDEO' && Boolean(active.fileUrl);
-  const isAudio =
+  const isAudioByName =
     isMedia && /\.(mp3|m4a|aac|wav|ogg|oga|opus|flac|weba)$/i.test(active?.fileName || '');
+  // Containers like .mpeg/.mov can hold audio only, so the element reports back
+  // once metadata lands and the presentation follows.
+  const isAudio = isMedia && (isAudioByName || audioOnly);
   const isVideo = isMedia && !isAudio;
+  const mediaSrc = toPlayableUrl(active?.fileUrl);
   const orderedObservations = sortObservations(observations);
 
   const openComposer = useCallback(() => {
@@ -198,6 +205,12 @@ export default function EvidencePanel({
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [openComposer]);
+
+  useEffect(() => {
+    setAudioOnly(false);
+    setDuration(0);
+    setCurrentTime(0);
+  }, [active?.id]);
 
   const seekTo = (timeSec: number) => {
     const video = videoRef.current;
@@ -285,7 +298,7 @@ export default function EvidencePanel({
                           controls
                           className="w-full"
                           preload="metadata"
-                          src={active.fileUrl}
+                          src={mediaSrc}
                           onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
                           onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
                         >
@@ -306,8 +319,12 @@ export default function EvidencePanel({
                           // Let the browser sniff the format: recordings arrive as
                           // .webm/.mov as often as .mp4, and a hard-coded type
                           // stopped those playing.
-                          src={active.fileUrl}
-                          onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+                          src={mediaSrc}
+                          onLoadedMetadata={(e) => {
+                            setDuration(e.currentTarget.duration || 0);
+                            // No video track: re-present it as an audio recording.
+                            if (e.currentTarget.videoWidth === 0) setAudioOnly(true);
+                          }}
                           onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
                         >
                           Your browser does not support the video tag.
@@ -318,7 +335,7 @@ export default function EvidencePanel({
                     {active.submissionType === 'DOCUMENT' && active.fileUrl && (
                       <div className="bg-white">
                         <DocumentSubmissionPreview
-                          fileUrl={active.fileUrl}
+                          fileUrl={toPlayableUrl(active.fileUrl)}
                           fileName={active.fileName}
                           fileSize={active.fileSize}
                         />

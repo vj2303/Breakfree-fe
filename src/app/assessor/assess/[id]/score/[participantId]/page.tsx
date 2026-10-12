@@ -5,6 +5,7 @@ import { Loader2, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { downloadParticipantReportPdf } from '@/lib/reports/participantReportPdf';
+import { toPlayableUrl } from '@/lib/mediaUrl';
 import { aiScoringApi, type AiSuggestion } from '@/lib/aiScoringApi';
 
 import {
@@ -1071,7 +1072,7 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
       console.log('Fetching video file for evaluation from:', submission.fileUrl);
       
       // Fetch the video file from the submission URL
-      const response = await fetch(submission.fileUrl);
+      const response = await fetch(toPlayableUrl(submission.fileUrl));
       
       if (!response.ok) {
         throw new Error(`Failed to fetch video file: ${response.status} ${response.statusText}`);
