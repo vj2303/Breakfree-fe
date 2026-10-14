@@ -12,6 +12,10 @@ import {
   isSyntheticScoreId,
 } from "../../../../../lib/reportSynthesis";
 import { KatalystReportPreview } from "../../../../../components/reports/KatalystReportPreview";
+import { mapWithConcurrency, withTimeout } from "../../../../../lib/concurrency";
+
+/** Ceiling for building one participant's report page (two AI calls). */
+const REPORT_PAGE_TIMEOUT_MS = 120_000;
 
 // --- INTERFACES ---
 
@@ -1118,105 +1122,140 @@ const HomePage = () => {
         content: FormattedReportContent;
       }> = [];
 
-      for (const score of stat.scores) {
-        const res = await fetch(
-          `${API_BASE_URL_WITH_API}/report-structures/generate-from-assessment-center`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              assessmentCenterId:
-                score.assessmentCenter?.id || score.assessmentCenterId,
-              participantId: score.participant?.id || score.participantId,
-            }),
-          }
-        );
+      // Each score costs two AI round-trips (report generation, then comment
+      // synthesis). Run three at a time: sequentially the preview took the sum
+      // of every call and the button simply sat on "Loading report…".
+      const failed: string[] = [];
+      const prepared = await mapWithConcurrency(stat.scores, 3, async (score) => {
+        try {
+          return await withTimeout(
+            (async () => {
+                    const res = await fetch(
+                      `${API_BASE_URL_WITH_API}/report-structures/generate-from-assessment-center`,
+                      {
+                        method: "POST",
+                        headers: {
+                          Authorization: `Bearer ${token}`,
+                          "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                          assessmentCenterId:
+                            score.assessmentCenter?.id || score.assessmentCenterId,
+                          participantId: score.participant?.id || score.participantId,
+                        }),
+                      }
+                    );
 
-        let content: FormattedReportContent;
-        if (res.ok) {
-          const r = await res.json();
-          content = formatReportContentForPDF(
-            r.data.reportContent,
-            score.participant?.name || "Unknown Participant",
-            score.assessmentCenter?.name || "Unknown Center",
-            score
+                    let content: FormattedReportContent;
+                    if (res.ok) {
+                      const r = await res.json();
+                      content = formatReportContentForPDF(
+                        r.data.reportContent,
+                        score.participant?.name || "Unknown Participant",
+                        score.assessmentCenter?.name || "Unknown Center",
+                        score
+                      );
+                    } else {
+                      content = formatReportContentForPDF(
+                        {},
+                        score.participant?.name || "Unknown Participant",
+                        score.assessmentCenter?.name || "Unknown Center",
+                        score
+                      );
+                    }
+
+                    const acIdForSynth =
+                      score.assessmentCenter?.id || score.assessmentCenterId;
+                    const participantIdForSynth =
+                      score.participant?.id || score.participantId;
+                    const assessorIdForSynth = score.assessorId || score.assessor?.id;
+                    const csKeys =
+                      score.competencyScores && typeof score.competencyScores === "object"
+                        ? Object.keys(score.competencyScores as object)
+                        : [];
+                    const needsSynth =
+                      content.comments.strengths.length === 0 ||
+                      content.comments.developmentAreas.length === 0;
+                    const synthBlockedByPlaceholder =
+                      isSyntheticScoreId(score.id) && csKeys.length === 0;
+
+                    console.log("[synthesize] row before API", {
+                      scoreId: score.id,
+                      synthetic: isSyntheticScoreId(score.id),
+                      assessmentCenterId: acIdForSynth,
+                      participantId: participantIdForSynth,
+                      assessorId: assessorIdForSynth,
+                      status: score.status,
+                      competencyScoreKeys: csKeys.length,
+                      needsSynth,
+                      synthBlockedByPlaceholder,
+                      expectSynthesizeInNetwork:
+                        needsSynth && !synthBlockedByPlaceholder,
+                    });
+
+                    if (needsSynth && synthBlockedByPlaceholder) {
+                      console.warn(
+                        "[synthesize] No POST to synthesize-strengths-and-development (nothing will show in Network for that URL): placeholder score row with no competencyScores. Use a submitted assessor score or rows that include competency data."
+                      );
+                    }
+
+                    content = await enrichReportContentWithSynthesizedComments(
+                      token,
+                      acIdForSynth,
+                      participantIdForSynth,
+                      content,
+                      {
+                        onlyFillIfEmpty: true,
+                        maxItemsPerSection: 6,
+                        locale: "en",
+                        tone: "professional coaching",
+                        scoreContext: {
+                          assessorId: assessorIdForSynth,
+                          scoreId: score.id,
+                          status: score.status,
+                          competencyScores: score.competencyScores as Record<
+                            string,
+                            Record<
+                              string,
+                              | number
+                              | { readiness?: number; application?: number }
+                            >
+                          >,
+                          overallComments: score.overallComments,
+                          individualComments: score.individualComments ?? null,
+                        },
+                      }
+                    );
+
+                    return content;
+            })(),
+            REPORT_PAGE_TIMEOUT_MS,
+            "the report took too long to build"
           );
-        } else {
-          content = formatReportContentForPDF(
-            {},
-            score.participant?.name || "Unknown Participant",
-            score.assessmentCenter?.name || "Unknown Center",
-            score
+        } catch (pageError: any) {
+          // One participant failing must not discard the pages that worked.
+          console.error("[assessor-report] page failed", score.id, pageError?.message);
+          failed.push(
+            `${score.participant?.name || "A participant"}: ${pageError?.message || "could not be prepared"}`
           );
+          return null;
         }
+      });
 
-        const acIdForSynth =
-          score.assessmentCenter?.id || score.assessmentCenterId;
-        const participantIdForSynth =
-          score.participant?.id || score.participantId;
-        const assessorIdForSynth = score.assessorId || score.assessor?.id;
-        const csKeys =
-          score.competencyScores && typeof score.competencyScores === "object"
-            ? Object.keys(score.competencyScores as object)
-            : [];
-        const needsSynth =
-          content.comments.strengths.length === 0 ||
-          content.comments.developmentAreas.length === 0;
-        const synthBlockedByPlaceholder =
-          isSyntheticScoreId(score.id) && csKeys.length === 0;
+      prepared.forEach((content, index) => {
+        if (content) preparedPages.push({ score: stat.scores[index], content });
+      });
 
-        console.log("[synthesize] row before API", {
-          scoreId: score.id,
-          synthetic: isSyntheticScoreId(score.id),
-          assessmentCenterId: acIdForSynth,
-          participantId: participantIdForSynth,
-          assessorId: assessorIdForSynth,
-          status: score.status,
-          competencyScoreKeys: csKeys.length,
-          needsSynth,
-          synthBlockedByPlaceholder,
-          expectSynthesizeInNetwork:
-            needsSynth && !synthBlockedByPlaceholder,
-        });
-
-        if (needsSynth && synthBlockedByPlaceholder) {
-          console.warn(
-            "[synthesize] No POST to synthesize-strengths-and-development (nothing will show in Network for that URL): placeholder score row with no competencyScores. Use a submitted assessor score or rows that include competency data."
-          );
-        }
-
-        content = await enrichReportContentWithSynthesizedComments(
-          token,
-          acIdForSynth,
-          participantIdForSynth,
-          content,
-          {
-            onlyFillIfEmpty: true,
-            maxItemsPerSection: 6,
-            locale: "en",
-            tone: "professional coaching",
-            scoreContext: {
-              assessorId: assessorIdForSynth,
-              scoreId: score.id,
-              status: score.status,
-              competencyScores: score.competencyScores as Record<
-                string,
-                Record<
-                  string,
-                  | number
-                  | { readiness?: number; application?: number }
-                >
-              >,
-              overallComments: score.overallComments,
-              individualComments: score.individualComments ?? null,
-            },
-          }
+      if (preparedPages.length === 0) {
+        setError(
+          failed.length
+            ? `No report pages could be built. ${failed.join(" | ")}`
+            : "No report pages could be built."
         );
-
-        preparedPages.push({ score, content });
+        return;
+      }
+      if (failed.length > 0) {
+        setError(`Some pages could not be built. ${failed.join(" | ")}`);
       }
 
       setReportPreviewStat(stat);
