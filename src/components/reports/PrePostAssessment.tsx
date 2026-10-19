@@ -35,6 +35,7 @@ const PrePostAssessment: React.FC<PrePostAssessmentProps> = ({
   assessmentCenterId,
 }) => {
   const [data, setData] = useState<CompetencyData[]>([]);
+  const [dataSource, setDataSource] = useState<'uploaded' | 'inferred' | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,6 +61,7 @@ const PrePostAssessment: React.FC<PrePostAssessmentProps> = ({
       if (res.ok) {
         const result = await res.json();
         setData(result.data?.competencies || []);
+        setDataSource(result.data?.dataSource ?? null);
       } else {
         setError('Failed to load data');
       }
@@ -118,6 +120,13 @@ const PrePostAssessment: React.FC<PrePostAssessmentProps> = ({
           <h3 className="text-sm font-semibold text-black">
             Pre vs Post Assessment ({participantName})
           </h3>
+          {dataSource && (
+            <p className="mt-1 text-xs text-gray-500">
+              {dataSource === 'uploaded'
+                ? 'Based on uploaded pre/post assessment scores.'
+                : 'Inferred from earliest vs latest assessor submission. Upload pre/post scores for a true comparison.'}
+            </p>
+          )}
         </div>
         <div className="px-4 py-3 overflow-x-auto">
           <table className="w-full border-collapse">

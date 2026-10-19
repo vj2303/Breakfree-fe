@@ -865,22 +865,23 @@ function AIReportPage() {
                 <span className="badge" style={{ background: pi.type === "RISK" ? "#C44E52" : "#2A9D8F", fontSize: 9 }}>{pi.type}</span>
                 <span style={{ fontSize: 13, fontWeight: 600, color: "#1B2B4B" }}>{pi.indicator}</span>
               </div>
-              <div style={{ fontSize: 11, color: "#6b7280" }}>{pi.timeframe} | Likelihood: {pi.likelihood}/10</div>
+              <div style={{ fontSize: 11, color: "#6b7280" }}>{pi.timeframe} | Likelihood: {pi.likelihood}/10 <em style={{ color: "#9ca3af" }}>(AI estimate)</em></div>
               <div style={{ fontSize: 11, color: "#374151", marginTop: 4 }}>Mitigation: {pi.mitigation}</div>
             </div>
           ))}
 
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: "#1B2B4B", marginTop: 24, marginBottom: 12 }}>Role Fit Assessment</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: "#1B2B4B", marginTop: 24, marginBottom: 4 }}>Role Fit Assessment</h3>
+          <p style={{ fontSize: 10, color: "#9ca3af", margin: "0 0 12px" }}>The fit ratings below are AI estimates on a 1–10 scale, not measured assessment scores.</p>
           <div className="insight-card">
             <div style={{ fontSize: 14, fontWeight: 700, color: "#1B2B4B", marginBottom: 12 }}>{insights.role_fit.title}</div>
             <div style={{ display: "flex", gap: 32, marginBottom: 12 }}>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 28, fontWeight: 700, color: "#1B2B4B" }}>{insights.role_fit.current_fit}</div>
-                <div style={{ fontSize: 10, color: "#6b7280" }}>Current Fit</div>
+                <div style={{ fontSize: 28, fontWeight: 700, color: "#1B2B4B" }}>{insights.role_fit.current_fit}<span style={{ fontSize: 13, fontWeight: 400, color: "#9ca3af" }}>/10</span></div>
+                <div style={{ fontSize: 10, color: "#6b7280" }}>Current Fit <em style={{ color: "#9ca3af" }}>(AI est.)</em></div>
               </div>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 28, fontWeight: 700, color: "#2A9D8F" }}>{insights.role_fit.potential_fit}</div>
-                <div style={{ fontSize: 10, color: "#6b7280" }}>Potential Fit</div>
+                <div style={{ fontSize: 28, fontWeight: 700, color: "#2A9D8F" }}>{insights.role_fit.potential_fit}<span style={{ fontSize: 13, fontWeight: 400, color: "#9ca3af" }}>/10</span></div>
+                <div style={{ fontSize: 10, color: "#6b7280" }}>Potential Fit <em style={{ color: "#9ca3af" }}>(AI est.)</em></div>
               </div>
               <div style={{ display: "flex", alignItems: "center" }}>
                 <div style={{ fontSize: 12, color: "#374151" }}>Timeline: <strong>{insights.role_fit.timeline}</strong></div>
@@ -907,13 +908,19 @@ function AIReportPage() {
           {recommendations.recommendations.map((rec) => {
             const prioColor = rec.priority === "HIGH" ? "#C44E52" : rec.priority === "MEDIUM" ? "#E9A23B" : "#2A9D8F";
             const prioBg = rec.priority === "HIGH" ? "#FEF2F2" : rec.priority === "MEDIUM" ? "#FFFBEB" : "#F0FDFA";
+            // Show the real measured competency score (out of 5) when we can
+            // match the recommendation to a scored competency, instead of the
+            // AI's own invented per-recommendation score.
+            const realComp = competencies.find((c) => c.name === rec.competency_name);
             return (
               <div key={rec.competency_name} className="rec-card">
                 <div className="rec-header" style={{ background: prioBg }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: "#1B2B4B" }}>{rec.competency_name}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <span className="badge" style={{ background: prioColor }}>{rec.priority}</span>
-                    <span style={{ fontSize: 11, color: "#6b7280" }}>Score: {rec.score}</span>
+                    {realComp
+                      ? <span style={{ fontSize: 11, color: "#6b7280" }}>Score: {realComp.score}/5</span>
+                      : <span style={{ fontSize: 11, color: "#6b7280" }}>Score: {rec.score} <em style={{ color: "#9ca3af" }}>(AI est.)</em></span>}
                   </div>
                 </div>
                 <div className="rec-body">

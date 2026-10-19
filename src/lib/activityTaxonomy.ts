@@ -24,6 +24,7 @@ export type InteractionActivityType =
   | 'CASE_STUDY_PRESENTATION'
   | 'CASE_STUDY_ANALYSIS'
   | 'ROLEPLAY'
+  | 'SIMULATION'
   /** Pre-split records, before presentation and analysis were separated. */
   | 'CASE_STUDY';
 
@@ -43,6 +44,7 @@ export const INTERACTION_ACTIVITY_TYPES: TaxonomyOption<InteractionActivityType>
   { value: 'CASE_STUDY_PRESENTATION', label: 'Case Study Presentation' },
   { value: 'CASE_STUDY_ANALYSIS', label: 'Case Study Analysis' },
   { value: 'ROLEPLAY', label: 'Role Play' },
+  { value: 'SIMULATION', label: 'Simulation' },
 ];
 
 /** Legacy value kept readable so existing records still display correctly. */
@@ -62,6 +64,7 @@ const BADGE_COLORS: Record<string, string> = {
   CASE_STUDY_PRESENTATION: 'bg-green-50 text-green-700 border-green-200',
   CASE_STUDY_ANALYSIS: 'bg-teal-50 text-teal-700 border-teal-200',
   ROLEPLAY: 'bg-purple-50 text-purple-700 border-purple-200',
+  SIMULATION: 'bg-amber-50 text-amber-700 border-amber-200',
   CASE_STUDY: 'bg-green-50 text-green-700 border-green-200',
 };
 
@@ -71,6 +74,7 @@ const SHORT_LABELS: Record<string, string> = {
   CASE_STUDY_PRESENTATION: 'Case Study — Presentation',
   CASE_STUDY_ANALYSIS: 'Case Study — Analysis',
   ROLEPLAY: 'Role Play',
+  SIMULATION: 'Simulation',
   CASE_STUDY: 'Case Study',
 };
 

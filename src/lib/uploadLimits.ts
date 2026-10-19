@@ -7,8 +7,8 @@
  * being uploaded for a minute and then rejected.
  */
 
-export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
-export const MAX_UPLOAD_LABEL = '100 MB';
+export const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
+export const MAX_UPLOAD_LABEL = '500 MB';
 
 /** `accept` values and the human list shown under each dropzone. */
 export const MEDIA_ACCEPT = 'video/*,audio/*,.mov,.m4a,.webm';

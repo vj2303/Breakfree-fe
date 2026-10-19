@@ -40,17 +40,34 @@ export function normalizeStoredToLevel(stored: number, numLevels: number): numbe
   return legacyTenPointToLevel(n, numLevels);
 }
 
+/**
+ * Mean of the sub-competencies the assessor actually scored.
+ *
+ * Only sub-competencies with a real score (value > 0) are counted, and the
+ * denominator is the number scored — not the total number of rows. Unscored
+ * sub-competencies used to be summed as 0 over the full denominator, which
+ * dragged the rating toward zero whenever an assessor left rows blank (and made
+ * an assigned-but-untouched activity contribute a phantom 0 to the cross-activity
+ * mean). Returns null when nothing in this competency was scored, so callers can
+ * skip it rather than average in a zero. Mirrors the backend's `asScore`, which
+ * also treats 0 as "not scored".
+ */
 export function averageSubCompetencyScores(
   subNames: string[],
   scoresBySub: Record<string, number> | undefined
 ): number | null {
   if (subNames.length === 0) return null;
   let sum = 0;
+  let scored = 0;
   for (const name of subNames) {
     const v = scoresBySub?.[name];
-    sum += typeof v === 'number' && !Number.isNaN(v) ? v : 0;
+    if (typeof v === 'number' && !Number.isNaN(v) && v > 0) {
+      sum += v;
+      scored += 1;
+    }
   }
-  return sum / subNames.length;
+  if (scored === 0) return null;
+  return sum / scored;
 }
 
 export function formatCompetencyAverage(avg: number | null): string {

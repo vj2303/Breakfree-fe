@@ -232,7 +232,10 @@ const HomePage = () => {
       const result = await res.json();
       if (result.success && result.data && result.data.groups) {
         setGroups(result.data.groups);
-        const groupsWithMockMarks: GroupWithAssessorMarks[] =
+        // participants and assessorMarks come straight from the /groups API
+        // response (the backend fills both, including participants attached via
+        // assignments). The `|| []` is only a defensive default, not mock data.
+        const groupsWithAssessorMarks: GroupWithAssessorMarks[] =
           result.data.groups.map(
             (group: Group & { participants?: GroupParticipant[] }) => ({
               ...group,
@@ -245,7 +248,7 @@ const HomePage = () => {
                 [],
             })
           );
-        setGroupsWithMarks(groupsWithMockMarks);
+        setGroupsWithMarks(groupsWithAssessorMarks);
       } else {
         setGroupsError(result.message || "Failed to fetch groups");
       }
@@ -685,9 +688,9 @@ const HomePage = () => {
 
     data.forEach((item, idx) => {
       const centerX = x + idx * groupWidth + groupWidth / 2;
-      const readiness = typeof item.readiness === "number" ? item.readiness : 5;
+      const readiness = typeof item.readiness === "number" ? item.readiness : 0;
       const application =
-        typeof item.application === "number" ? item.application : 5;
+        typeof item.application === "number" ? item.application : 0;
       const rH = (readiness / maxVal) * chartHeight;
       const aH = (application / maxVal) * chartHeight;
 
@@ -1033,8 +1036,8 @@ const HomePage = () => {
         const chartData = content.analysis.competencies.map(
           (c: Record<string, unknown>) => ({
             name: typeof c.name === "string" ? c.name : "Competency",
-            readiness: typeof c.readiness === "number" ? c.readiness : 5,
-            application: typeof c.application === "number" ? c.application : 5,
+            readiness: typeof c.readiness === "number" ? c.readiness : 0,
+            application: typeof c.application === "number" ? c.application : 0,
           })
         );
         if (chartData.length > 0) {
@@ -1156,12 +1159,22 @@ const HomePage = () => {
                         score
                       );
                     } else {
-                      content = formatReportContentForPDF(
-                        {},
-                        score.participant?.name || "Unknown Participant",
-                        score.assessmentCenter?.name || "Unknown Center",
-                        score
-                      );
+                      // Surface why the backend could not build this report
+                      // (no report template, no submitted assessor scores, …)
+                      // instead of silently rendering a blank page. The thrown
+                      // message is collected per-participant into `failed[]`.
+                      let reason = `report could not be generated (HTTP ${res.status})`;
+                      try {
+                        const errBody = await res.json();
+                        if (errBody?.message) {
+                          reason = errBody.code
+                            ? `${errBody.message} (${errBody.code})`
+                            : errBody.message;
+                        }
+                      } catch {
+                        /* non-JSON error body — keep the generic reason */
+                      }
+                      throw new Error(reason);
                     }
 
                     const acIdForSynth =

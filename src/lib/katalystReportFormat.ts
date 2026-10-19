@@ -64,8 +64,50 @@ export function formatReportContentForPDF(
     console.error("Error parsing analysis content", error);
   }
 
+  // part2Analysis.content holds only the narrative, so the competencies parsed
+  // above carry no readiness/application. The backend also sends a
+  // part2Analysis.competencies array with the REAL per-competency scores
+  // (readiness from the readiness upload, application from the marks assessors
+  // actually gave). Overlay those by name so the chart and score table show
+  // real readiness-vs-application instead of duplicating one number onto both
+  // bars (or falling back to a default of 5).
+  const realRatingsByName = new Map<
+    string,
+    { readiness: number; application: number; score: number }
+  >();
+  if (part2Analysis && Array.isArray(part2Analysis.competencies)) {
+    (part2Analysis.competencies as Array<Record<string, unknown>>).forEach(
+      (c) => {
+        const name = typeof c.name === "string" ? c.name : undefined;
+        if (!name) return;
+        const readiness =
+          typeof c.readiness === "number" ? c.readiness : undefined;
+        const application =
+          typeof c.application === "number" ? c.application : undefined;
+        if (readiness === undefined && application === undefined) return;
+        const a = application ?? readiness ?? 0;
+        const r = readiness ?? application ?? 0;
+        realRatingsByName.set(name, {
+          readiness: r,
+          application: a,
+          score: typeof c.score === "number" ? c.score : a,
+        });
+      }
+    );
+  }
+  if (realRatingsByName.size > 0) {
+    competencies = competencies.map((comp: Record<string, unknown>) => {
+      const name = typeof comp.name === "string" ? comp.name : undefined;
+      const real = name ? realRatingsByName.get(name) : undefined;
+      return real ? { ...comp, ...real, __hasRealRatings: true } : comp;
+    });
+  }
+
   if (score?.competencyScores && typeof score.competencyScores === "object") {
     competencies = competencies.map((comp: Record<string, unknown>) => {
+      // Real backend readiness/application already overlaid — don't overwrite it
+      // by re-deriving readiness == application from the flat stored marks.
+      if (comp.__hasRealRatings) return comp;
       const compId = comp.id || comp.competencyId || comp.name;
       const compScoresObj = score.competencyScores as Record<string, unknown>;
       const compScores = compScoresObj[compId as string];

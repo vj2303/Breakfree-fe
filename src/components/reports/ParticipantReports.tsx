@@ -97,6 +97,10 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
   const [readinessUploadStatus, setReadinessUploadStatus] = useState<{ acId: string; message: string; type: 'success' | 'error' } | null>(null);
   const readinessFileRef = React.useRef<HTMLInputElement>(null);
   const [pendingUploadACId, setPendingUploadACId] = useState<string | null>(null);
+  const [uploadingPrePost, setUploadingPrePost] = useState<string | null>(null); // AC id being uploaded
+  const [prePostUploadStatus, setPrePostUploadStatus] = useState<{ acId: string; message: string; type: 'success' | 'error' } | null>(null);
+  const prePostFileRef = React.useRef<HTMLInputElement>(null);
+  const [pendingPrePostACId, setPendingPrePostACId] = useState<string | null>(null);
   /** Hides assessment centers nobody has scored yet, so the list reads like a live cohort. */
   const [showOnlyScored, setShowOnlyScored] = useState(true);
   /** Set when an assessment center row is opened in the full Participant Overview. */
@@ -407,6 +411,59 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
     }
   };
 
+  const handleUploadPrePostScores = async (assessmentCenterId: string, file: File) => {
+    if (!token) return;
+    setUploadingPrePost(assessmentCenterId);
+    setPrePostUploadStatus(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('assessmentCenterId', assessmentCenterId);
+
+      const response = await fetch(`${API_V1_BASE_URL}/pre-post-scores/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Upload failed');
+      }
+
+      setPrePostUploadStatus({
+        acId: assessmentCenterId,
+        message: `Uploaded: ${data.data.savedCount} saved, ${data.data.skippedCount} skipped`,
+        type: 'success',
+      });
+    } catch (err) {
+      setPrePostUploadStatus({
+        acId: assessmentCenterId,
+        message: err instanceof Error ? err.message : 'Upload failed',
+        type: 'error',
+      });
+    } finally {
+      setUploadingPrePost(null);
+    }
+  };
+
+  const triggerPrePostUpload = (assessmentCenterId: string) => {
+    setPendingPrePostACId(assessmentCenterId);
+    prePostFileRef.current?.click();
+  };
+
+  const onPrePostFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && pendingPrePostACId) {
+      handleUploadPrePostScores(pendingPrePostACId, file);
+    }
+    e.target.value = '';
+    setPendingPrePostACId(null);
+  };
+
   /** Swap between the list and the overview, scrolling back to the top so the new view is framed. */
   const openOverview = (
     target: { participant: ParticipantData; assessmentCenter: AssessmentCenterData } | null
@@ -484,6 +541,14 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
         type="file"
         ref={readinessFileRef}
         onChange={onReadinessFileChange}
+        accept=".xlsx,.xls"
+        className="hidden"
+      />
+      {/* Hidden file input for pre/post score upload */}
+      <input
+        type="file"
+        ref={prePostFileRef}
+        onChange={onPrePostFileChange}
         accept=".xlsx,.xls"
         className="hidden"
       />
@@ -807,6 +872,16 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
                                 description: 'Excel (.xlsx) of readiness scores',
                                 onSelect: () => triggerReadinessUpload(ac.id),
                               },
+                              {
+                                label:
+                                  uploadingPrePost === ac.id
+                                    ? 'Uploading…'
+                                    : 'Upload pre/post scores',
+                                icon: Upload,
+                                loading: uploadingPrePost === ac.id,
+                                description: 'Excel (.xlsx): Email | Competency | Pre | Post',
+                                onSelect: () => triggerPrePostUpload(ac.id),
+                              },
                             ]}
                           />
                         </div>
@@ -817,6 +892,15 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
                               : 'bg-red-50 text-red-700 border border-red-200'
                           }`}>
                             {readinessUploadStatus.message}
+                          </div>
+                        )}
+                        {prePostUploadStatus && prePostUploadStatus.acId === ac.id && (
+                          <div className={`w-full text-xs px-3 py-1.5 rounded ${
+                            prePostUploadStatus.type === 'success'
+                              ? 'bg-green-50 text-green-700 border border-green-200'
+                              : 'bg-red-50 text-red-700 border border-red-200'
+                          }`}>
+                            {prePostUploadStatus.message}
                           </div>
                         )}
                               </div>

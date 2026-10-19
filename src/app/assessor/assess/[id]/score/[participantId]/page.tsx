@@ -57,6 +57,7 @@ const ACTIVITY_TYPE_LABELS: Record<string, string> = {
   GROUP_DISCUSSION: 'Group Discussion',
   ROLEPLAY: 'Roleplay',
   ROLE_PLAY: 'Roleplay',
+  SIMULATION: 'Simulation',
   CASE_STUDY: 'Case Study',
   INBOX_ACTIVITY: 'Inbox Activity',
   INTERVIEW: 'Interview',
