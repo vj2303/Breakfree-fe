@@ -71,7 +71,7 @@ export default function JoinUs() {
                     
           {/* Title */}
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Welcome to Skill Sight AI
+            Welcome to Skill Insight AI
           </h1>
                     
           {/* Subtitle */}

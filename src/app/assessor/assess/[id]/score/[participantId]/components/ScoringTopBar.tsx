@@ -178,9 +178,9 @@ export default function ScoringTopBar({
       {/* Breadcrumb row */}
       <div className="flex items-center gap-3 border-b border-gray-100 px-4 py-2.5">
         <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-violet-600 text-xs font-bold text-white">
-          A
+          S
         </span>
-        <span className="text-sm font-semibold text-black">Assessment Center</span>
+        <span className="text-sm font-semibold text-black">Skill Insight AI</span>
 
         <nav className="ml-3 hidden min-w-0 items-center gap-1.5 text-xs text-gray-500 md:flex">
           <button type="button" onClick={onBack} className="hover:text-gray-800">
