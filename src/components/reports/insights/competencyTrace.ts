@@ -38,25 +38,6 @@ export interface CompetencyTrace {
 export const scoreOrNull = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
 
-export const SAMPLE_PRE_ASSESSMENT_NOTE =
-  'Pre-assessment score is sample data for demonstration — it is not read from the system. Upload a pre-assessment sheet to replace it.';
-
-/**
- * The placeholder pre-assessment figure for a competency.
- *
- * Derived from the competency code rather than drawn at random: the same
- * competency must always show the same number, because a figure that changes
- * on every render reads as a bug rather than as sample data.
- */
-export function samplePreAssessmentScore(code: string): number {
-  let hash = 0;
-  for (let index = 0; index < code.length; index += 1) {
-    hash = (hash * 31 + code.charCodeAt(index)) % 997;
-  }
-  // 2.6 – 3.6, a believable baseline below a typical post-assessment score.
-  return Math.round((2.6 + (hash % 11) / 10) * 10) / 10;
-}
-
 /** How many participants in a trace carry each kind of evidence. */
 export function summariseTrace(trace: CompetencyTrace | undefined) {
   const participants = trace?.participants ?? [];

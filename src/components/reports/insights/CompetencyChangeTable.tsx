@@ -5,12 +5,9 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 
 import { formatScore } from '../participantOverview/scoring';
 import type { ProgressPoint } from '../participantOverview/types';
-import {
-  SAMPLE_PRE_ASSESSMENT_NOTE,
-  samplePreAssessmentScore,
-  summariseTrace,
-} from './competencyTrace';
+import { summariseTrace } from './competencyTrace';
 import type { CompetencyTrace } from './competencyTrace';
+import { SAMPLE_PRE_ASSESSMENT_NOTE } from '../sampleScores';
 
 export interface CompetencyChangeRow extends ProgressPoint {
   /** Participants contributing a score to this competency. */
@@ -24,7 +21,7 @@ export interface CompetencyChangeTableProps {
 }
 
 /** Columns in the body, for the expanded row's colSpan. */
-const COLUMN_COUNT = 9;
+const COLUMN_COUNT = 8;
 
 /** Plain average, one decimal. */
 function Score({ value }: { value: number | null }) {
@@ -143,7 +140,7 @@ function TracePanel({ row }: { row: CompetencyChangeRow }) {
           }
         />
         <SourceCard
-          label="Pre-assessment score"
+          label="Pre-assessment chart"
           source="Sample data"
           detail="Placeholder for demonstration — not read from the system"
           tone="sample"
@@ -251,7 +248,7 @@ export default function CompetencyChangeTable({ rows }: CompetencyChangeTablePro
       </p>
 
       <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[1040px] border-collapse text-left">
+        <table className="w-full min-w-[900px] border-collapse text-left">
           <thead>
             <tr className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
               <th rowSpan={2} className="border-b border-gray-200 py-3 pr-4 align-bottom">
@@ -262,15 +259,6 @@ export default function CompetencyChangeTable({ rows }: CompetencyChangeTablePro
                 className="w-16 border-b border-gray-200 py-3 pr-4 text-center align-bottom"
               >
                 N
-              </th>
-              <th
-                rowSpan={2}
-                className="w-36 border-b border-l border-gray-200 px-4 py-3 text-center align-bottom"
-              >
-                <span className="block text-gray-600">Pre-assessment score</span>
-                <span className="mt-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">
-                  Sample
-                </span>
               </th>
               <th
                 colSpan={2}
@@ -354,16 +342,6 @@ export default function CompetencyChangeTable({ rows }: CompetencyChangeTablePro
                     </td>
                     <td className="py-4 pr-4 text-center text-sm tabular-nums text-gray-600">
                       {row.n}
-                    </td>
-
-                    {/* Sample figure, tinted so it is never mistaken for a recorded score. */}
-                    <td className="border-l border-gray-100 py-4 text-center">
-                      <span
-                        title={SAMPLE_PRE_ASSESSMENT_NOTE}
-                        className="rounded bg-amber-50 px-2 py-0.5 text-sm tabular-nums text-amber-800"
-                      >
-                        {samplePreAssessmentScore(row.code).toFixed(1)}
-                      </span>
                     </td>
 
                     <td className="border-l border-gray-100 py-4 text-center">

@@ -14,7 +14,7 @@ import {
 
 import { formatScore } from '../participantOverview/scoring';
 import type { ProgressPoint } from '../participantOverview/types';
-import { SAMPLE_PRE_ASSESSMENT_NOTE, samplePreAssessmentScore } from './competencyTrace';
+import { SAMPLE_PRE_ASSESSMENT_NOTE, samplePreAssessmentScore } from '../sampleScores';
 
 const READINESS_COLOR = '#7c3aed';
 const APPLICATION_COLOR = '#2563eb';

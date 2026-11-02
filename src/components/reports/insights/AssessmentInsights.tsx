@@ -11,7 +11,7 @@ import InsightsFilterBar from './InsightsFilterBar';
 import type { FilterOption } from './InsightsFilterBar';
 import InsightsStatTiles from './InsightsStatTiles';
 import ReadinessApplicationCharts from './ReadinessApplicationCharts';
-import { scoreOrNull, samplePreAssessmentScore } from './competencyTrace';
+import { scoreOrNull } from './competencyTrace';
 import type { CompetencyTrace, PrePostSource, TraceParticipantEntry } from './competencyTrace';
 import {
   assessorCompetencyAverage,
@@ -428,7 +428,6 @@ export default function AssessmentInsights({ token }: AssessmentInsightsProps) {
     const header = [
       'Competency',
       'N',
-      'Pre-assessment score (sample)',
       'Readiness change',
       'Application change',
       'Assessors',
@@ -437,7 +436,6 @@ export default function AssessmentInsights({ token }: AssessmentInsightsProps) {
       [
         `"${row.code} — ${row.competencyName.replace(/"/g, '""')}"`,
         row.n,
-        samplePreAssessmentScore(row.code).toFixed(1),
         row.readinessDelta === null ? '' : row.readinessDelta.toFixed(1),
         row.applicationDelta === null ? '' : row.applicationDelta.toFixed(1),
         `"${Array.from(
