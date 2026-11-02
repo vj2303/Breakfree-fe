@@ -262,6 +262,15 @@ export function buildProgressPoints(
   const prePostById = new Map(prePost.map((row) => [row.competencyId as string, row]));
   const readinessById = new Map(readiness.map((row) => [row.competencyId as string, row]));
 
+  /**
+   * Both endpoints return 0 where nothing was recorded, and the scales start
+   * at 1 — so a 0 is an absent score, not a low one. Reading it as a score is
+   * what pulled a competency scored 3.5 and 3.4 down to 0.9: the participants
+   * with nothing recorded were averaged in as zeros.
+   */
+  const score = (value: unknown): number | null =>
+    typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+
   const num = (value: unknown): number | null =>
     typeof value === 'number' && Number.isFinite(value) ? value : null;
 
@@ -272,14 +281,16 @@ export function buildProgressPoints(
     const pp = prePostById.get(competency.id) || {};
     const ar = readinessById.get(competency.id) || {};
 
-    const preApplication = num(pp.preAssessmentApp);
-    const postApplication = num(pp.preAssessmentApp2) ?? num(ar.applicationAverage);
-    const postReadiness = num(pp.postAssessmentReadiness) ?? num(ar.readiness);
+    const preApplication = score(pp.preAssessmentApp);
+    // The fallbacks only work if a 0 reads as absent: with `num` the first
+    // term was 0 rather than null, so the real figure was never reached.
+    const postApplication = score(pp.preAssessmentApp2) ?? score(ar.applicationAverage);
+    const postReadiness = score(pp.postAssessmentReadiness) ?? score(ar.readiness);
     const improvement = num(pp.improvement);
     const preReadiness =
       postReadiness !== null && improvement !== null
-        ? Number((postReadiness - improvement).toFixed(2))
-        : num(ar.readiness);
+        ? score(Number((postReadiness - improvement).toFixed(2)))
+        : score(ar.readiness);
 
     return {
       code: competency.code,

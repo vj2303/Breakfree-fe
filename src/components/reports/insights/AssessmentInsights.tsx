@@ -388,8 +388,14 @@ export default function AssessmentInsights({ token }: AssessmentInsightsProps) {
         applicationDelta: mean(perParticipant.map((p) => p.applicationDelta)),
       };
 
-      const contributing = perParticipant.filter(
-        (p) => p.readinessDelta !== null || p.applicationDelta !== null
+      // N is who contributed a figure to this competency. Counting only those
+      // with a delta hid every participant who has been scored but has no
+      // pre-assessment baseline to be compared against — which is all of them
+      // until a pre-assessment sheet is uploaded.
+      const contributing = perParticipant.filter((p) =>
+        [p.preReadiness, p.preApplication, p.postReadiness, p.postApplication].some(
+          (value) => value !== null
+        )
       ).length;
 
       const trace: CompetencyTrace = {
