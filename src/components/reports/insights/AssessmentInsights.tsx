@@ -11,8 +11,15 @@ import InsightsFilterBar from './InsightsFilterBar';
 import type { FilterOption } from './InsightsFilterBar';
 import InsightsStatTiles from './InsightsStatTiles';
 import ReadinessApplicationCharts from './ReadinessApplicationCharts';
-import { buildProgressPoints, mean, parseCompetencyName } from '../participantOverview/scoring';
-import type { OverviewCompetency, ProgressPoint } from '../participantOverview/types';
+import { scoreOrNull, samplePreAssessmentScore } from './competencyTrace';
+import type { CompetencyTrace, PrePostSource, TraceParticipantEntry } from './competencyTrace';
+import {
+  assessorCompetencyAverage,
+  buildProgressPoints,
+  mean,
+  parseCompetencyName,
+} from '../participantOverview/scoring';
+import type { AssessorRecord, OverviewCompetency, ProgressPoint } from '../participantOverview/types';
 
 export interface AssessmentInsightsProps {
   token: string | null;
@@ -45,6 +52,8 @@ interface ParticipantRollup {
   scored: boolean;
   lastActivityAt: string | null;
   points: ProgressPoint[];
+  /** competencyId -> where this participant's figures came from. */
+  trace: Record<string, TraceParticipantEntry>;
 }
 
 const ALL = '__all__';
@@ -273,6 +282,38 @@ export default function AssessmentInsights({ token }: AssessmentInsightsProps) {
           });
         });
 
+        // Provenance, recorded per competency while the three sources are still
+        // separate: the readiness sheet, the assessors' own score matrices, and
+        // whether pre/post was uploaded or inferred from submission order.
+        const readinessRows: RawRecord[] = readinessJson?.data?.competencies || [];
+        const readinessById = new Map(
+          readinessRows.map((row) => [row.competencyId as string, row])
+        );
+        const prePostSource: PrePostSource = prePostJson?.data?.dataSource ?? null;
+
+        const trace: Record<string, TraceParticipantEntry> = {};
+        overviewCompetencies.forEach((competency) => {
+          const readinessRow = readinessById.get(competency.id) || {};
+          const assessors = scores.map((score) => ({
+            assessorName: score.assessor?.name || 'Unknown assessor',
+            status: (score.status as string) || 'NOT_STARTED',
+            submittedAt: (score.submittedAt as string) || null,
+            score: assessorCompetencyAverage(
+              score as unknown as AssessorRecord,
+              entry.activityIds,
+              competency
+            ),
+          }));
+
+          trace[competency.id] = {
+            participantName: entry.participant.name,
+            application: scoreOrNull(readinessRow.applicationAverage),
+            readiness: scoreOrNull(readinessRow.readiness),
+            prePostSource,
+            assessors,
+          };
+        });
+
         return {
           participant: entry.participant,
           inScope: true,
@@ -283,8 +324,9 @@ export default function AssessmentInsights({ token }: AssessmentInsightsProps) {
           points: buildProgressPoints(
             overviewCompetencies,
             prePostJson?.data?.competencies || [],
-            readinessJson?.data?.competencies || []
+            readinessRows
           ),
+          trace,
         };
       });
 
@@ -350,8 +392,15 @@ export default function AssessmentInsights({ token }: AssessmentInsightsProps) {
         (p) => p.readinessDelta !== null || p.applicationDelta !== null
       ).length;
 
+      const trace: CompetencyTrace = {
+        competencyId: competency.id,
+        participants: visibleRollups
+          .map((entry) => entry.trace?.[competency.id])
+          .filter((entry): entry is TraceParticipantEntry => Boolean(entry)),
+      };
+
       points.push(averaged);
-      rows.push({ ...averaged, n: contributing });
+      rows.push({ ...averaged, n: contributing, trace });
     });
 
     return { chartPoints: points, tableRows: rows };
@@ -376,13 +425,31 @@ export default function AssessmentInsights({ token }: AssessmentInsightsProps) {
   const selectedCenterName = centers.find((c) => c.id === centerFilter)?.name || '';
 
   const exportCsv = () => {
-    const header = ['Competency', 'N', 'Readiness change', 'Application change'];
+    const header = [
+      'Competency',
+      'N',
+      'Pre-assessment score (sample)',
+      'Readiness change',
+      'Application change',
+      'Assessors',
+    ];
     const lines = tableRows.map((row) =>
       [
         `"${row.code} — ${row.competencyName.replace(/"/g, '""')}"`,
         row.n,
+        samplePreAssessmentScore(row.code).toFixed(1),
         row.readinessDelta === null ? '' : row.readinessDelta.toFixed(1),
         row.applicationDelta === null ? '' : row.applicationDelta.toFixed(1),
+        `"${Array.from(
+          new Set(
+            (row.trace?.participants ?? []).flatMap((entry) =>
+              entry.assessors.filter((a) => a.score !== null).map((a) => a.assessorName)
+            )
+          )
+        )
+          .sort()
+          .join('; ')
+          .replace(/"/g, '""')}"`,
       ].join(',')
     );
     const blob = new Blob([[header.join(','), ...lines].join('\n')], {
@@ -492,7 +559,8 @@ export default function AssessmentInsights({ token }: AssessmentInsightsProps) {
       <p className="border-t border-gray-200 pt-5 text-sm text-gray-400">
         {generatedAt ? `Data as of ${generatedAt} · ` : ''}
         Scores are averages on a 5-point scale (1 = Low, 5 = High) · Readiness source: psychometric
-        assessment (external) and SJT (in-platform)
+        assessment (external) and SJT (in-platform) · Application source: assessor BARS ratings ·
+        Open any competency row for the full trace
       </p>
     </div>
   );
