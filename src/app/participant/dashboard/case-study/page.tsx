@@ -9,6 +9,7 @@ import { AssignmentSubmissionApi } from '@/lib/assignmentSubmissionApi';
 import { ActivityData } from './types';
 import OverviewStep from './OverviewStep';
 import ScenarioStep from './ScenarioStep';
+import SimulationStep from './SimulationStep';
 import TaskStep from './TaskStep';
 import ReviewStep from './ReviewStep';
 import Timer from '@/components/Timer';
@@ -20,6 +21,9 @@ const steps = [
   'Task',
   'Review',
 ];
+
+/** A simulation carries its own brief and task, so it replaces both steps. */
+const SIMULATION_STEPS = ['Overview and Instructions', 'Simulation', 'Review'];
 
 const CaseStudyPageWithSearchParams = () => {
   const searchParams = useSearchParams();
@@ -47,8 +51,19 @@ const CaseStudyPageWithSearchParams = () => {
     isSubmitted: boolean;
   }>>([]);
 
+  const [simulationDone, setSimulationDone] = useState(false);
+
   const assignmentId = searchParams.get('assignmentId');
   const activityId = searchParams.get('activityId');
+
+  // An interaction activity runs a built-in simulation when it is of type
+  // Simulation and names one. Without a key it stays a recorded activity, so
+  // Simulation activities created before this existed are unaffected.
+  const simulationKey = activityData?.activityDetail?.simulationKey;
+  const isSimulation =
+    activityData?.activityDetail?.interactiveActivityType === 'SIMULATION' &&
+    Boolean(simulationKey);
+  const activeSteps = isSimulation ? SIMULATION_STEPS : steps;
   
   // Calculate total time from scenarios and tasks (readTime + exerciseTime)
   const calculateTotalTime = (): number => {
@@ -77,14 +92,30 @@ const CaseStudyPageWithSearchParams = () => {
   const totalTimeMinutes = calculateTotalTime();
   
   // Calculate progress percentage
-  const progressPercentage = ((currentStep + 1) / steps.length) * 100;
+  const progressPercentage = ((currentStep + 1) / activeSteps.length) * 100;
 
-  const stepContent = [
-    <OverviewStep key="overview" activityData={activityData} />, 
-    <ScenarioStep key="scenario" activityData={activityData} />, 
-    <TaskStep key="task" activityData={activityData} submissionData={submissionData} setSubmissionData={setSubmissionData} />, 
-    <ReviewStep key="review" activityData={activityData} submissionData={submissionData} />
-  ];
+  const stepContent = isSimulation
+    ? [
+        <OverviewStep key="overview" activityData={activityData} />,
+        <SimulationStep
+          key="simulation"
+          activityData={activityData}
+          submissionData={submissionData}
+          setSubmissionData={setSubmissionData}
+          completed={simulationDone}
+          onCompleted={() => setSimulationDone(true)}
+        />,
+        <ReviewStep key="review" activityData={activityData} submissionData={submissionData} />,
+      ]
+    : [
+        <OverviewStep key="overview" activityData={activityData} />,
+        <ScenarioStep key="scenario" activityData={activityData} />,
+        <TaskStep key="task" activityData={activityData} submissionData={submissionData} setSubmissionData={setSubmissionData} />,
+        <ReviewStep key="review" activityData={activityData} submissionData={submissionData} />,
+      ];
+
+  // The run has to be finished before there is anything to review or submit.
+  const blockedOnSimulation = isSimulation && currentStep === 1 && !simulationDone;
 
   useEffect(() => {
     if (assignmentId && assignments?.assignments) {
@@ -133,7 +164,7 @@ const CaseStudyPageWithSearchParams = () => {
   }, [assignmentId, activityId, assignments, router]);
 
   const handleNext = () => {
-    if (currentStep < steps.length - 1) setCurrentStep(currentStep + 1);
+    if (currentStep < activeSteps.length - 1) setCurrentStep(currentStep + 1);
   };
 
   const handlePrev = () => {
@@ -330,7 +361,7 @@ const CaseStudyPageWithSearchParams = () => {
 
         {/* Stepper */}
         <div className="flex items-center gap-3 mb-2 overflow-x-auto pb-1">
-          {steps.map((step, idx) => (
+          {activeSteps.map((step, idx) => (
             <div key={step} className="flex items-center gap-2 flex-shrink-0">
               <div className="flex flex-col items-center">
                 <span className={`text-xs font-medium whitespace-nowrap ${currentStep === idx ? 'text-black font-semibold' : currentStep > idx ? 'text-gray-700' : 'text-gray-500'}`}>
@@ -352,7 +383,7 @@ const CaseStudyPageWithSearchParams = () => {
                   )}
                 </span>
               </div>
-              {idx < steps.length - 1 && (
+              {idx < activeSteps.length - 1 && (
                 <div className={`w-8 h-0.5 transition-all duration-200 ${
                   currentStep > idx ? 'bg-gray-700' : 'bg-gray-300'
                 }`} />
@@ -370,7 +401,7 @@ const CaseStudyPageWithSearchParams = () => {
       {/* Navigation Buttons */}
       <div className="flex justify-between items-center gap-3 bg-white rounded-lg shadow-sm border border-gray-200 px-4 py-3">
         <div className="text-xs text-gray-600">
-          <span className="font-medium">Step {currentStep + 1} of {steps.length}</span>
+          <span className="font-medium">Step {currentStep + 1} of {activeSteps.length}</span>
         </div>
         <div className="flex gap-2">
           {currentStep > 0 && (
@@ -384,10 +415,12 @@ const CaseStudyPageWithSearchParams = () => {
               Previous
             </button>
           )}
-          {currentStep < steps.length - 1 ? (
+          {currentStep < activeSteps.length - 1 ? (
             <button
-              className="px-4 py-2 rounded bg-black text-white text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-1.5"
+              className="px-4 py-2 rounded bg-black text-white text-sm font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
               onClick={handleNext}
+              disabled={blockedOnSimulation}
+              title={blockedOnSimulation ? 'Finish the simulation first' : undefined}
             >
               {currentStep === 0 ? 'Start' : 'Next'}
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

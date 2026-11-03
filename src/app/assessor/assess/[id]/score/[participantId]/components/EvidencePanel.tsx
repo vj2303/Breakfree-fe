@@ -8,7 +8,9 @@ import { toPlayableUrl } from '@/lib/mediaUrl';
 import { formatClock, markerColor, sortObservations } from '../lib/observations';
 import type { Observation } from '../lib/observations';
 import type { SubmissionRecord } from '../lib/types';
+import { parseSimulationPayload } from '@/lib/simulations/result';
 import ObservationList from './ObservationList';
+import SimulationEvidence from './SimulationEvidence';
 
 export interface EvidencePanelProps {
   activityLabel: string;
@@ -161,6 +163,9 @@ export default function EvidencePanel({
 
   const isInbox = activityType === 'INBOX_ACTIVITY';
   const active = sorted.find((s) => s.id === activeSubmissionId) ?? sorted[0];
+  // A simulation stores its run alongside the transcript; render the run
+  // rather than the transcript, which is written for the model to read.
+  const simulationRun = parseSimulationPayload(active?.notes);
   // Audio recordings are stored as VIDEO submissions; tell them apart by file
   // name so an audio file gets an audio player rather than a black rectangle.
   const isMedia = !isInbox && active?.submissionType === 'VIDEO' && Boolean(active.fileUrl);
@@ -342,12 +347,17 @@ export default function EvidencePanel({
                       </div>
                     )}
 
-                    {active.submissionType === 'TEXT' && active.textContent && (
-                      <div
-                        className="prose prose-sm max-w-none bg-white p-3 text-xs text-gray-800"
-                        dangerouslySetInnerHTML={{ __html: active.textContent }}
-                      />
-                    )}
+                    {active.submissionType === 'TEXT' &&
+                      (simulationRun ? (
+                        <SimulationEvidence payload={simulationRun} />
+                      ) : (
+                        active.textContent && (
+                          <div
+                            className="prose prose-sm max-w-none bg-white p-3 text-xs text-gray-800"
+                            dangerouslySetInnerHTML={{ __html: active.textContent }}
+                          />
+                        )
+                      ))}
                   </div>
 
                   {isVideo && (

@@ -7,6 +7,7 @@ import {
   INTERACTION_ACTIVITY_TYPES_WITH_LEGACY,
   type InteractionActivityType,
 } from '@/lib/activityTaxonomy';
+import { SIMULATIONS } from '@/lib/simulations';
 
 type InteractiveActivityType = InteractionActivityType;
 
@@ -23,6 +24,7 @@ interface OverviewStepProps {
     description?: string;
     videoUrl?: string;
     interactiveActivityType?: InteractiveActivityType;
+    simulationKey?: string;
   };
   updateFormData: (field: string, value: string | number) => void;
 }
@@ -56,6 +58,27 @@ const OverviewStep: React.FC<OverviewStepProps> = ({ formData, updateFormData })
           ))}
         </select>
       </div>
+      {formData.interactiveActivityType === 'SIMULATION' && (
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Simulation</label>
+          <select
+            value={formData.simulationKey || ''}
+            onChange={(e) => updateFormData('simulationKey', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+          >
+            <option value="">No built-in simulation — participant records a response</option>
+            {SIMULATIONS.map((simulation) => (
+              <option key={simulation.key} value={simulation.key}>
+                {simulation.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500 mt-1">
+            {SIMULATIONS.find((s) => s.key === formData.simulationKey)?.summary ??
+              'Choose a simulation for the participant to work through in the platform. Left blank, this activity behaves like a role play: the participant uploads or records a response.'}
+          </p>
+        </div>
+      )}
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
         <textarea

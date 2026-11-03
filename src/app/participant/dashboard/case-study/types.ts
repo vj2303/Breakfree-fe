@@ -17,7 +17,9 @@ export interface ActivityData {
     description: string;
     instructions: string;
     videoUrl?: string;
-    interactiveActivityType?: 'GD' | 'ROLEPLAY' | 'CASE_STUDY';
+    interactiveActivityType?: 'GD' | 'ROLEPLAY' | 'SIMULATION' | 'CASE_STUDY';
+    /** Set on a Simulation activity: which simulation the participant runs. */
+    simulationKey?: string | null;
     createdBy: string;
     createdAt: string;
     updatedAt: string;

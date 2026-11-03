@@ -64,12 +64,19 @@ interface CaseStudyApiResponse {
   name?: string;
   description?: string;
   videoUrl?: string;
-  interactiveActivityType?: 'GD' | 'ROLEPLAY' | 'CASE_STUDY';
+  interactiveActivityType?: InteractiveActivityType;
+  simulationKey?: string | null;
   scenarios?: ApiScenario[];
   tasks?: ApiTask[];
 }
 
-type InteractiveActivityType = 'GD' | 'ROLEPLAY' | 'CASE_STUDY';
+type InteractiveActivityType =
+  | 'GD'
+  | 'ROLEPLAY'
+  | 'CASE_STUDY_PRESENTATION'
+  | 'CASE_STUDY_ANALYSIS'
+  | 'SIMULATION'
+  | 'CASE_STUDY';
 
 const CaseStudyAssessment = () => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -81,6 +88,7 @@ const CaseStudyAssessment = () => {
     description: '',
     videoUrl: '',
     interactiveActivityType: 'CASE_STUDY' as InteractiveActivityType,
+    simulationKey: '',
   });
   
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
@@ -124,6 +132,7 @@ const CaseStudyAssessment = () => {
             name: parsed.name || '',
             description: parsed.description || '',
             interactiveActivityType: parsed.interactiveActivityType || 'CASE_STUDY',
+            simulationKey: parsed.simulationKey || '',
           }));
         } catch {}
         localStorage.removeItem('caseStudyDraft');
@@ -145,6 +154,7 @@ const CaseStudyAssessment = () => {
             description: data.description || '',
             videoUrl: data.videoUrl || '',
             interactiveActivityType: data.interactiveActivityType || 'CASE_STUDY',
+            simulationKey: data.simulationKey || '',
           });
           setScenarios(
             (data.scenarios || []).map((s: ApiScenario) => ({
@@ -277,6 +287,10 @@ const CaseStudyAssessment = () => {
           instructions: formData.overview || '',
           videoUrl: formData.videoUrl || '',
           interactiveActivityType: formData.interactiveActivityType || undefined,
+          // Only a Simulation activity carries one; switching type away from
+          // Simulation clears it rather than leaving it to fire later.
+          simulationKey:
+            formData.interactiveActivityType === 'SIMULATION' ? formData.simulationKey || '' : '',
           scenarios: scenarios.map(s => ({
             title: s.title || '',
             readTime: Number(s.readingTime) || 1,
