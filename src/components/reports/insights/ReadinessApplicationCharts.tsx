@@ -166,12 +166,18 @@ export interface ReadinessApplicationChartsProps {
 }
 
 export default function ReadinessApplicationCharts({ points }: ReadinessApplicationChartsProps) {
-  // The pre-assessment panel plots the same placeholder figures the table's
-  // Pre-assessment score column shows, so chart and column never disagree.
   const chartPoints: ChartPoint[] = points.map((point) => ({
     ...point,
     samplePre: samplePreAssessmentScore(point.code),
   }));
+
+  // The chart must never disagree with the table beside it. Real
+  // pre-assessment figures win; the placeholder baseline is only drawn when
+  // there are none at all, so the panel is not left empty before a
+  // pre-assessment sheet has been uploaded.
+  const hasRealPre = points.some(
+    (point) => point.preReadiness !== null || point.preApplication !== null
+  );
 
   return (
     <section>
@@ -181,7 +187,7 @@ export default function ReadinessApplicationCharts({ points }: ReadinessApplicat
       <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-sm text-gray-500">
           Readiness: psychometric &amp; SJT assessments · Application: assessment centre observed
-          evidence · Pre-assessment is sample data
+          evidence{hasRealPre ? '' : ' · Pre-assessment is sample data'}
         </p>
         <p className="text-sm text-gray-400">Scale: 1 (low) to 5 (high)</p>
       </div>
@@ -189,18 +195,36 @@ export default function ReadinessApplicationCharts({ points }: ReadinessApplicat
       <div className="mt-4 flex flex-col divide-y divide-gray-200 rounded-xl border border-gray-200 bg-white shadow-sm lg:flex-row lg:divide-x lg:divide-y-0">
         <ChartPanel
           tag="Pre-assessment"
-          sample
+          sample={!hasRealPre}
           points={chartPoints}
           domain={[1, 5]}
           ticks={[1, 2, 3, 4, 5]}
-          series={[
-            {
-              key: 'samplePre',
-              name: 'Pre-assessment score (sample)',
-              color: SAMPLE_COLOR,
-              labelPosition: 'top',
-            },
-          ]}
+          series={
+            hasRealPre
+              ? [
+                  {
+                    key: 'preReadiness',
+                    name: 'Readiness (Pre)',
+                    color: READINESS_COLOR,
+                    labelPosition: 'top',
+                  },
+                  {
+                    key: 'preApplication',
+                    name: 'Application (Pre)',
+                    color: APPLICATION_COLOR,
+                    dashed: true,
+                    labelPosition: 'bottom',
+                  },
+                ]
+              : [
+                  {
+                    key: 'samplePre',
+                    name: 'Pre-assessment score (sample)',
+                    color: SAMPLE_COLOR,
+                    labelPosition: 'top',
+                  },
+                ]
+          }
         />
         <ChartPanel
           tag="Post-assessment"

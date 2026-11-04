@@ -98,7 +98,7 @@ function statusLabel(status: string): string {
 }
 
 /** The dropdown: every figure in the row traced back to who recorded it. */
-function TracePanel({ row }: { row: CompetencyChangeRow }) {
+function TracePanel({ row, hasRealPre }: { row: CompetencyChangeRow; hasRealPre: boolean }) {
   const summary = summariseTrace(row.trace);
   const participants = row.trace?.participants ?? [];
 
@@ -141,9 +141,13 @@ function TracePanel({ row }: { row: CompetencyChangeRow }) {
         />
         <SourceCard
           label="Pre-assessment chart"
-          source="Sample data"
-          detail="Placeholder for demonstration — not read from the system"
-          tone="sample"
+          source={hasRealPre ? 'As shown in this table' : 'Sample data'}
+          detail={
+            hasRealPre
+              ? 'Plots the pre-assessment figures in this row'
+              : 'Placeholder for demonstration — not read from the system'
+          }
+          tone={hasRealPre ? 'default' : 'sample'}
         />
       </div>
 
@@ -228,6 +232,12 @@ export default function CompetencyChangeTable({ rows }: CompetencyChangeTablePro
       else next.add(code);
       return next;
     });
+
+  // Only claim the pre-assessment is sample data while it actually is: once a
+  // sheet is uploaded the chart plots the real figures shown here.
+  const hasRealPre = rows.some(
+    (row) => row.preReadiness !== null || row.preApplication !== null
+  );
 
   // A cohort where every figure is zero means the source data is missing, not flat.
   const hasAnyScore = rows.some((row) =>
@@ -369,7 +379,7 @@ export default function CompetencyChangeTable({ rows }: CompetencyChangeTablePro
                   {isOpen && (
                     <tr className="border-b border-gray-100">
                       <td colSpan={COLUMN_COUNT} className="p-0">
-                        <TracePanel row={row} />
+                        <TracePanel row={row} hasRealPre={hasRealPre} />
                       </td>
                     </tr>
                   )}
@@ -380,7 +390,7 @@ export default function CompetencyChangeTable({ rows }: CompetencyChangeTablePro
         </table>
       </div>
 
-      {rows.length > 0 && (
+      {rows.length > 0 && !hasRealPre && (
         <p className="mt-3 text-xs text-amber-700">{SAMPLE_PRE_ASSESSMENT_NOTE}</p>
       )}
 

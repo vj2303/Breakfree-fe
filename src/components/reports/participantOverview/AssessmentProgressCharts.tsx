@@ -166,12 +166,17 @@ export default function AssessmentProgressCharts({
   competencies,
   points,
 }: AssessmentProgressChartsProps) {
-  // The pre-assessment chart plots the same placeholder baseline the cohort
-  // view uses, so a participant's chart and the cohort's never disagree.
   const chartPoints: ChartPoint[] = points.map((point) => ({
     ...point,
     samplePre: samplePreAssessmentScore(point.code),
   }));
+
+  // Real pre-assessment figures win. The placeholder baseline is drawn only
+  // when the participant has none, so the chart never shows one number while
+  // the rest of the screen shows another.
+  const hasRealPre = points.some(
+    (point) => point.preReadiness !== null || point.preApplication !== null
+  );
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -196,18 +201,35 @@ export default function AssessmentProgressCharts({
         <ProgressChart
           index={1}
           title="Pre-assessment"
-          subtitle="Baseline score per competency"
-          sample
+          subtitle={hasRealPre ? 'Readiness vs application' : 'Baseline score per competency'}
+          sample={!hasRealPre}
           points={chartPoints}
           domain={[0, 5]}
-          series={[
-            {
-              key: 'samplePre',
-              name: 'Pre-assessment score (sample)',
-              color: SAMPLE_COLOR,
-              labelPosition: 'top',
-            },
-          ]}
+          series={
+            hasRealPre
+              ? [
+                  {
+                    key: 'preReadiness',
+                    name: 'Readiness',
+                    color: READINESS_COLOR,
+                    labelPosition: 'top',
+                  },
+                  {
+                    key: 'preApplication',
+                    name: 'Application',
+                    color: APPLICATION_COLOR,
+                    labelPosition: 'bottom',
+                  },
+                ]
+              : [
+                  {
+                    key: 'samplePre',
+                    name: 'Pre-assessment score (sample)',
+                    color: SAMPLE_COLOR,
+                    labelPosition: 'top',
+                  },
+                ]
+          }
         />
         <ProgressChart
           index={2}
@@ -254,7 +276,9 @@ export default function AssessmentProgressCharts({
         />
       </div>
 
-      <p className="mt-4 text-xs text-amber-700">{SAMPLE_PRE_ASSESSMENT_NOTE}</p>
+      {!hasRealPre && (
+        <p className="mt-4 text-xs text-amber-700">{SAMPLE_PRE_ASSESSMENT_NOTE}</p>
+      )}
     </div>
   );
 }
