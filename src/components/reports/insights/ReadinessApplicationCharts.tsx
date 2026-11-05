@@ -14,17 +14,12 @@ import {
 
 import { formatScore } from '../participantOverview/scoring';
 import type { ProgressPoint } from '../participantOverview/types';
-import { SAMPLE_PRE_ASSESSMENT_NOTE, samplePreAssessmentScore } from '../sampleScores';
 
 const READINESS_COLOR = '#7c3aed';
 const APPLICATION_COLOR = '#2563eb';
-const SAMPLE_COLOR = '#b45309';
-
-/** The plotted row: the real figures plus the sample pre-assessment score. */
-type ChartPoint = ProgressPoint & { samplePre: number };
 
 interface SeriesConfig {
-  key: keyof ChartPoint;
+  key: keyof ProgressPoint;
   name: string;
   color: string;
   dashed?: boolean;
@@ -61,16 +56,13 @@ function ChartPanel({
   domain,
   ticks,
   signed,
-  sample,
 }: {
   tag: string;
   series: SeriesConfig[];
-  points: ChartPoint[];
+  points: ProgressPoint[];
   domain: [number | 'auto', number | 'auto'];
   ticks?: number[];
   signed?: boolean;
-  /** Marks a panel whose figures are placeholders, not recorded scores. */
-  sample?: boolean;
 }) {
   const format = (value: unknown) => {
     if (typeof value !== 'number' || Number.isNaN(value)) return '';
@@ -88,14 +80,6 @@ function ChartPanel({
         <span className="inline-block rounded-md bg-gray-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-600">
           {tag}
         </span>
-        {sample && (
-          <span
-            title={SAMPLE_PRE_ASSESSMENT_NOTE}
-            className="inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700"
-          >
-            Sample
-          </span>
-        )}
       </div>
 
       <Legend series={series} />
@@ -166,19 +150,9 @@ export interface ReadinessApplicationChartsProps {
 }
 
 export default function ReadinessApplicationCharts({ points }: ReadinessApplicationChartsProps) {
-  const chartPoints: ChartPoint[] = points.map((point) => ({
-    ...point,
-    samplePre: samplePreAssessmentScore(point.code),
-  }));
-
-  // The chart must never disagree with the table beside it. Real
-  // pre-assessment figures win; the placeholder baseline is only drawn when
-  // there are none at all, so the panel is not left empty before a
-  // pre-assessment sheet has been uploaded.
-  const hasRealPre = points.some(
-    (point) => point.preReadiness !== null || point.preApplication !== null
-  );
-
+  // Every panel plots recorded scores only. A stage with nothing recorded
+  // reads "No data for this selection", matching the table beside it — a
+  // drawn line with no row behind it is worse than an empty panel.
   return (
     <section>
       <h2 className="text-lg font-bold text-black">
@@ -187,7 +161,7 @@ export default function ReadinessApplicationCharts({ points }: ReadinessApplicat
       <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-sm text-gray-500">
           Readiness: psychometric &amp; SJT assessments · Application: assessment centre observed
-          evidence{hasRealPre ? '' : ' · Pre-assessment is sample data'}
+          evidence
         </p>
         <p className="text-sm text-gray-400">Scale: 1 (low) to 5 (high)</p>
       </div>
@@ -195,40 +169,28 @@ export default function ReadinessApplicationCharts({ points }: ReadinessApplicat
       <div className="mt-4 flex flex-col divide-y divide-gray-200 rounded-xl border border-gray-200 bg-white shadow-sm lg:flex-row lg:divide-x lg:divide-y-0">
         <ChartPanel
           tag="Pre-assessment"
-          sample={!hasRealPre}
-          points={chartPoints}
+          points={points}
           domain={[1, 5]}
           ticks={[1, 2, 3, 4, 5]}
-          series={
-            hasRealPre
-              ? [
-                  {
-                    key: 'preReadiness',
-                    name: 'Readiness (Pre)',
-                    color: READINESS_COLOR,
-                    labelPosition: 'top',
-                  },
-                  {
-                    key: 'preApplication',
-                    name: 'Application (Pre)',
-                    color: APPLICATION_COLOR,
-                    dashed: true,
-                    labelPosition: 'bottom',
-                  },
-                ]
-              : [
-                  {
-                    key: 'samplePre',
-                    name: 'Pre-assessment score (sample)',
-                    color: SAMPLE_COLOR,
-                    labelPosition: 'top',
-                  },
-                ]
-          }
+          series={[
+            {
+              key: 'preReadiness',
+              name: 'Readiness (Pre)',
+              color: READINESS_COLOR,
+              labelPosition: 'top',
+            },
+            {
+              key: 'preApplication',
+              name: 'Application (Pre)',
+              color: APPLICATION_COLOR,
+              dashed: true,
+              labelPosition: 'bottom',
+            },
+          ]}
         />
         <ChartPanel
           tag="Post-assessment"
-          points={chartPoints}
+          points={points}
           domain={[1, 5]}
           ticks={[1, 2, 3, 4, 5]}
           series={[
@@ -249,7 +211,7 @@ export default function ReadinessApplicationCharts({ points }: ReadinessApplicat
         />
         <ChartPanel
           tag="Change (post – pre)"
-          points={chartPoints}
+          points={points}
           domain={['auto', 'auto']}
           signed
           series={[

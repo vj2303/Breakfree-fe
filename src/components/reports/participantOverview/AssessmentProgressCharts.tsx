@@ -14,7 +14,6 @@ import {
 
 import { formatScore } from './scoring';
 import type { OverviewCompetency, ProgressPoint } from './types';
-import { SAMPLE_PRE_ASSESSMENT_NOTE, samplePreAssessmentScore } from '../sampleScores';
 
 export interface AssessmentProgressChartsProps {
   competencies: OverviewCompetency[];
@@ -23,13 +22,9 @@ export interface AssessmentProgressChartsProps {
 
 const READINESS_COLOR = '#7c3aed';
 const APPLICATION_COLOR = '#2563eb';
-const SAMPLE_COLOR = '#b45309';
-
-/** The plotted row: the participant's real figures plus the sample baseline. */
-type ChartPoint = ProgressPoint & { samplePre: number };
 
 interface SeriesConfig {
-  key: keyof ChartPoint;
+  key: keyof ProgressPoint;
   name: string;
   color: string;
   /** Keeps the two labels on a point from colliding. */
@@ -53,17 +48,14 @@ function ProgressChart({
   points,
   domain,
   signed,
-  sample,
 }: {
   index: number;
   title: string;
   subtitle: string;
   series: SeriesConfig[];
-  points: ChartPoint[];
+  points: ProgressPoint[];
   domain: [number | 'auto', number | 'auto'];
   signed?: boolean;
-  /** Marks a chart whose figures are placeholders, not recorded scores. */
-  sample?: boolean;
 }) {
   const format = (value: unknown) => {
     if (typeof value !== 'number' || Number.isNaN(value)) return '';
@@ -78,18 +70,8 @@ function ProgressChart({
 
   return (
     <div className="min-w-0">
-      <h4 className="flex flex-wrap items-center gap-2 text-sm font-bold text-black">
-        <span>
-          {index}. {title}
-        </span>
-        {sample && (
-          <span
-            title={SAMPLE_PRE_ASSESSMENT_NOTE}
-            className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700"
-          >
-            Sample
-          </span>
-        )}
+      <h4 className="text-sm font-bold text-black">
+        {index}. {title}
       </h4>
       <p className="text-xs text-gray-500">{subtitle}</p>
 
@@ -166,18 +148,8 @@ export default function AssessmentProgressCharts({
   competencies,
   points,
 }: AssessmentProgressChartsProps) {
-  const chartPoints: ChartPoint[] = points.map((point) => ({
-    ...point,
-    samplePre: samplePreAssessmentScore(point.code),
-  }));
-
-  // Real pre-assessment figures win. The placeholder baseline is drawn only
-  // when the participant has none, so the chart never shows one number while
-  // the rest of the screen shows another.
-  const hasRealPre = points.some(
-    (point) => point.preReadiness !== null || point.preApplication !== null
-  );
-
+  // Recorded scores only. A stage with nothing recorded shows the empty
+  // state, so the chart can never disagree with the figures beside it.
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
       <h3 className="text-base font-bold text-black">Assessment Progress</h3>
@@ -201,41 +173,29 @@ export default function AssessmentProgressCharts({
         <ProgressChart
           index={1}
           title="Pre-assessment"
-          subtitle={hasRealPre ? 'Readiness vs application' : 'Baseline score per competency'}
-          sample={!hasRealPre}
-          points={chartPoints}
+          subtitle="Readiness vs application"
+          points={points}
           domain={[0, 5]}
-          series={
-            hasRealPre
-              ? [
-                  {
-                    key: 'preReadiness',
-                    name: 'Readiness',
-                    color: READINESS_COLOR,
-                    labelPosition: 'top',
-                  },
-                  {
-                    key: 'preApplication',
-                    name: 'Application',
-                    color: APPLICATION_COLOR,
-                    labelPosition: 'bottom',
-                  },
-                ]
-              : [
-                  {
-                    key: 'samplePre',
-                    name: 'Pre-assessment score (sample)',
-                    color: SAMPLE_COLOR,
-                    labelPosition: 'top',
-                  },
-                ]
-          }
+          series={[
+            {
+              key: 'preReadiness',
+              name: 'Readiness',
+              color: READINESS_COLOR,
+              labelPosition: 'top',
+            },
+            {
+              key: 'preApplication',
+              name: 'Application',
+              color: APPLICATION_COLOR,
+              labelPosition: 'bottom',
+            },
+          ]}
         />
         <ProgressChart
           index={2}
           title="Post-assessment"
           subtitle="Readiness vs application"
-          points={chartPoints}
+          points={points}
           domain={[0, 5]}
           series={[
             {
@@ -256,7 +216,7 @@ export default function AssessmentProgressCharts({
           index={3}
           title="Improvement (post – pre)"
           subtitle="Change in scores"
-          points={chartPoints}
+          points={points}
           domain={['auto', 'auto']}
           signed
           series={[
@@ -275,10 +235,6 @@ export default function AssessmentProgressCharts({
           ]}
         />
       </div>
-
-      {!hasRealPre && (
-        <p className="mt-4 text-xs text-amber-700">{SAMPLE_PRE_ASSESSMENT_NOTE}</p>
-      )}
     </div>
   );
 }

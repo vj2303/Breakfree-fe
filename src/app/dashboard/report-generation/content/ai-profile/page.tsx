@@ -4,7 +4,6 @@ import { AIProfileCard } from './AIProfileCard';
 import { CreateProfileModal } from './CreateProfileModal';
 import { AIProfileApi } from '../../../../../lib/aiProfileApi';
 import { useAuth } from '../../../../../context/AuthContext';
-import { dummyProfiles } from './dummyData';
 import { AIProfile, PaginationInfo } from './types';
 
 const AIProfilesPage: React.FC = () => {
@@ -46,10 +45,11 @@ const AIProfilesPage: React.FC = () => {
         setError(null);
         
         if (!token) {
-          console.log('No token available, using dummy data');
-          // Use dummy data as fallback when no token is available
-          setProfiles(dummyProfiles);
+          // An empty list, never demo rows: fabricated profiles are
+          // indistinguishable from real ones once they are on screen.
+          setProfiles([]);
           setPagination(null);
+          setError('You are signed out — log in again to load AI profiles.');
           setLoading(false);
           return;
         }
@@ -70,16 +70,15 @@ const AIProfilesPage: React.FC = () => {
           setProfiles(profilesData);
           setPagination(paginationData);
         } else {
-          console.log('API failed, using dummy data as fallback');
-          setProfiles(dummyProfiles);
+          setProfiles([]);
           setPagination(null);
-          setError(response.message || 'Failed to fetch AI profiles - using demo data');
+          setError(response.message || 'Failed to fetch AI profiles.');
         }
       } catch (err) {
-        console.log('API error, using dummy data as fallback:', err);
-        setProfiles(dummyProfiles);
+        console.error('Error fetching AI profiles:', err);
+        setProfiles([]);
         setPagination(null);
-        setError('API unavailable - using demo data');
+        setError('AI profiles could not be loaded. Please try again.');
       } finally {
         setLoading(false);
       }

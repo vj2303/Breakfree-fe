@@ -7,7 +7,6 @@ import { formatScore } from '../participantOverview/scoring';
 import type { ProgressPoint } from '../participantOverview/types';
 import { summariseTrace } from './competencyTrace';
 import type { CompetencyTrace } from './competencyTrace';
-import { SAMPLE_PRE_ASSESSMENT_NOTE } from '../sampleScores';
 
 export interface CompetencyChangeRow extends ProgressPoint {
   /** Participants contributing a score to this competency. */
@@ -56,29 +55,17 @@ function SourceCard({
   label,
   source,
   detail,
-  tone = 'default',
 }: {
   label: string;
   source: string;
   detail: string;
-  tone?: 'default' | 'sample';
 }) {
   return (
-    <div
-      className={`rounded-lg border px-3 py-2.5 ${
-        tone === 'sample' ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-white'
-      }`}
-    >
+    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5">
       <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
         {label}
       </div>
-      <div
-        className={`mt-0.5 text-sm font-semibold ${
-          tone === 'sample' ? 'text-amber-800' : 'text-black'
-        }`}
-      >
-        {source}
-      </div>
+      <div className="mt-0.5 text-sm font-semibold text-black">{source}</div>
       <div className="mt-0.5 text-xs text-gray-500">{detail}</div>
     </div>
   );
@@ -98,7 +85,7 @@ function statusLabel(status: string): string {
 }
 
 /** The dropdown: every figure in the row traced back to who recorded it. */
-function TracePanel({ row, hasRealPre }: { row: CompetencyChangeRow; hasRealPre: boolean }) {
+function TracePanel({ row }: { row: CompetencyChangeRow }) {
   const summary = summariseTrace(row.trace);
   const participants = row.trace?.participants ?? [];
 
@@ -141,13 +128,8 @@ function TracePanel({ row, hasRealPre }: { row: CompetencyChangeRow; hasRealPre:
         />
         <SourceCard
           label="Pre-assessment chart"
-          source={hasRealPre ? 'As shown in this table' : 'Sample data'}
-          detail={
-            hasRealPre
-              ? 'Plots the pre-assessment figures in this row'
-              : 'Placeholder for demonstration — not read from the system'
-          }
-          tone={hasRealPre ? 'default' : 'sample'}
+          source="As shown in this table"
+          detail="Plots the pre-assessment figures in this row"
         />
       </div>
 
@@ -232,12 +214,6 @@ export default function CompetencyChangeTable({ rows }: CompetencyChangeTablePro
       else next.add(code);
       return next;
     });
-
-  // Only claim the pre-assessment is sample data while it actually is: once a
-  // sheet is uploaded the chart plots the real figures shown here.
-  const hasRealPre = rows.some(
-    (row) => row.preReadiness !== null || row.preApplication !== null
-  );
 
   // A cohort where every figure is zero means the source data is missing, not flat.
   const hasAnyScore = rows.some((row) =>
@@ -379,7 +355,7 @@ export default function CompetencyChangeTable({ rows }: CompetencyChangeTablePro
                   {isOpen && (
                     <tr className="border-b border-gray-100">
                       <td colSpan={COLUMN_COUNT} className="p-0">
-                        <TracePanel row={row} hasRealPre={hasRealPre} />
+                        <TracePanel row={row} />
                       </td>
                     </tr>
                   )}
@@ -389,10 +365,6 @@ export default function CompetencyChangeTable({ rows }: CompetencyChangeTablePro
           </tbody>
         </table>
       </div>
-
-      {rows.length > 0 && !hasRealPre && (
-        <p className="mt-3 text-xs text-amber-700">{SAMPLE_PRE_ASSESSMENT_NOTE}</p>
-      )}
 
       {rows.length > 0 && !hasAnyScore && (
         <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">
