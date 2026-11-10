@@ -226,6 +226,8 @@ interface LoginData {
 interface AuthResult {
   success: boolean;
   message?: string;
+  /** Field-level validation errors from the server, so callers can highlight inputs. */
+  errors?: Array<{ field: string; message: string }>;
   data?: {
     user?: User;
     token?: string;
@@ -627,6 +629,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return {
           success: false,
           message: result.message || "Registration failed",
+          errors: Array.isArray(result.errors) ? result.errors : undefined,
           data: result.data || undefined,
         };
       }

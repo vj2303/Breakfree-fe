@@ -17,11 +17,22 @@ export async function POST(request: Request) {
     const result = await response.json();
 
     if (!response.ok) {
+      // Build a user-facing message from the backend's field-level validation
+      // errors so the client can show exactly what to fix (and highlight it),
+      // instead of only the generic "Validation error".
+      const fieldErrors: Array<{ field: string; message: string }> = Array.isArray(result.errors)
+        ? result.errors
+        : [];
+      const detailedMessage = fieldErrors.length > 0
+        ? fieldErrors.map((e) => e.message).join(' ')
+        : (result.message || 'Registration failed');
+
       return NextResponse.json(
-        { 
-          success: false, 
-          message: result.message || 'Registration failed' 
-        }, 
+        {
+          success: false,
+          message: detailedMessage,
+          errors: fieldErrors,
+        },
         { status: response.status }
       );
     }

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { Eye, EyeOff, ChevronDown } from 'lucide-react'
+import { Eye, EyeOff, ChevronDown, Check, X } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { showError, showSuccess } from '@/utils/toast'
 
@@ -17,12 +17,19 @@ type FormDataType = {
   agreeToTerms: boolean;
 };
 
+type FieldErrors = Partial<Record<keyof FormDataType, string>>;
+
+// Password rules enforced on the Register screen. Keep in sync with the
+// backend registerSchema (password must be at least 6 characters).
+const PASSWORD_MIN_LENGTH = 6;
+
 export default function Register() {
   const router = useRouter()
   const { register } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [selectedCountryCode, setSelectedCountryCode] = useState('+91')
   const [isLoading, setIsLoading] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [formData, setFormData] = useState<FormDataType>({
     firstName: '',
     lastName: '',
@@ -32,28 +39,73 @@ export default function Register() {
     agreeToTerms: false,
   })
 
+  const passwordMeetsLength = formData.password.length >= PASSWORD_MIN_LENGTH
+
   const handleInputChange = (field: keyof FormDataType, value: string | boolean) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }))
+    // Clear the error for a field as soon as the user edits it.
+    setFieldErrors(prev => {
+      if (!prev[field]) return prev
+      const next = { ...prev }
+      delete next[field]
+      return next
+    })
+  }
+
+  // Validate on the screen where the user entered the data, returning a map of
+  // field -> message so each invalid input can be highlighted individually.
+  const validate = (): FieldErrors => {
+    const errors: FieldErrors = {}
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+    if (!formData.firstName.trim()) errors.firstName = 'First name is required'
+    if (!formData.lastName.trim()) errors.lastName = 'Last name is required'
+
+    if (!formData.email.trim()) {
+      errors.email = 'Email is required'
+    } else if (!emailRegex.test(formData.email)) {
+      errors.email = 'Please enter a valid email address'
+    }
+
+    if (!formData.password) {
+      errors.password = 'Password is required'
+    } else if (formData.password.length < PASSWORD_MIN_LENGTH) {
+      errors.password = `Password must be at least ${PASSWORD_MIN_LENGTH} characters`
+    }
+
+    if (!formData.agreeToTerms) {
+      errors.agreeToTerms = 'Please accept the Terms and Privacy Policies to continue'
+    }
+
+    return errors
+  }
+
+  // Map backend field names to our form field names so server-side validation
+  // errors highlight the correct input.
+  const mapServerField = (field: string): keyof FormDataType | null => {
+    switch (field) {
+      case 'password': return 'password'
+      case 'email': return 'email'
+      case 'firstName': return 'firstName'
+      case 'lastName': return 'lastName'
+      case 'phoneNumber': return 'phoneNumber'
+      default: return null
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
-    // Validate required fields (phone number is optional)
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.agreeToTerms) {
-      showError('Please fill in all required fields and agree to terms')
+    const errors = validate()
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
+      showError('Please fix the highlighted fields and try again.')
       return
     }
-
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(formData.email)) {
-      showError('Please enter a valid email address')
-      return
-    }
+    setFieldErrors({})
 
     // Prepare data for API. Phone number is optional and only sent when provided.
     const payload: {
@@ -84,7 +136,17 @@ export default function Register() {
         showSuccess('Registration completed successfully!');
         router.push('/dashboard');
       } else {
-        // Show error message without navigating
+        // Surface server-side validation errors on the specific fields.
+        if (result.errors && result.errors.length > 0) {
+          const mapped: FieldErrors = {}
+          for (const err of result.errors) {
+            const field = mapServerField(err.field)
+            if (field) mapped[field] = err.message
+          }
+          if (Object.keys(mapped).length > 0) {
+            setFieldErrors(mapped)
+          }
+        }
         showError(result.message || 'Registration failed. Please check your information and try again.');
       }
     } catch (error) {
@@ -98,6 +160,11 @@ export default function Register() {
   const handleLoginRedirect = () => {
     router.push('/login')
   }
+
+  const inputClass = (field: keyof FormDataType, extra = '') =>
+    `w-full px-4 py-3 border rounded-lg outline-none text-black ${extra} ${
+      fieldErrors[field] ? 'border-red-500' : 'border-gray-300'
+    }`
 
   return (
     <div
@@ -129,7 +196,7 @@ export default function Register() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} noValidate className="space-y-6">
             {/* First Name and Last Name */}
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -141,8 +208,11 @@ export default function Register() {
                   value={formData.firstName}
                   onChange={(e) => handleInputChange('firstName', e.target.value)}
                   placeholder="Enter first name"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg outline-none text-black"
+                  className={inputClass('firstName')}
                 />
+                {fieldErrors.firstName && (
+                  <p className="mt-1 text-sm text-red-600">{fieldErrors.firstName}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -153,8 +223,11 @@ export default function Register() {
                   value={formData.lastName}
                   onChange={(e) => handleInputChange('lastName', e.target.value)}
                   placeholder="Enter last name"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg outline-none text-black"
+                  className={inputClass('lastName')}
                 />
+                {fieldErrors.lastName && (
+                  <p className="mt-1 text-sm text-red-600">{fieldErrors.lastName}</p>
+                )}
               </div>
             </div>
 
@@ -168,8 +241,11 @@ export default function Register() {
                 value={formData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
                 placeholder="Enter your email address"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg outline-none text-black"
+                className={inputClass('email')}
               />
+              {fieldErrors.email && (
+                <p className="mt-1 text-sm text-red-600">{fieldErrors.email}</p>
+              )}
             </div>
 
             {/* Password */}
@@ -183,7 +259,7 @@ export default function Register() {
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
                   placeholder="Enter your password"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg outline-none pr-12 text-black"
+                  className={inputClass('password', 'pr-12')}
                 />
                 <button
                   type="button"
@@ -193,6 +269,20 @@ export default function Register() {
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
+              {/* Password rules shown up-front and checked live */}
+              <div className="mt-2 flex items-center text-sm">
+                {passwordMeetsLength ? (
+                  <Check size={16} className="text-green-600 mr-1.5 shrink-0" />
+                ) : (
+                  <X size={16} className={`mr-1.5 shrink-0 ${fieldErrors.password ? 'text-red-500' : 'text-gray-400'}`} />
+                )}
+                <span className={passwordMeetsLength ? 'text-green-600' : (fieldErrors.password ? 'text-red-600' : 'text-gray-500')}>
+                  At least {PASSWORD_MIN_LENGTH} characters
+                </span>
+              </div>
+              {fieldErrors.password && (
+                <p className="mt-1 text-sm text-red-600">{fieldErrors.password}</p>
+              )}
             </div>
 
             {/* Phone Number (optional) */}
@@ -218,26 +308,36 @@ export default function Register() {
                   value={formData.phoneNumber}
                   onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
                   placeholder="8077854435"
-                  className="flex-1 px-4 py-3 border border-l-0 border-gray-300 rounded-r-lg outline-none text-black"
+                  className={`flex-1 px-4 py-3 border border-l-0 rounded-r-lg outline-none text-black ${
+                    fieldErrors.phoneNumber ? 'border-red-500' : 'border-gray-300'
+                  }`}
                 />
               </div>
+              {fieldErrors.phoneNumber && (
+                <p className="mt-1 text-sm text-red-600">{fieldErrors.phoneNumber}</p>
+              )}
             </div>
 
             {/* Terms Agreement */}
-            <div className="flex items-start space-x-3">
-              <input
-                type="checkbox"
-                id="terms"
-                checked={formData.agreeToTerms}
-                onChange={(e) => handleInputChange('agreeToTerms', e.target.checked)}
-                className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <label htmlFor="terms" className="text-sm text-gray-600">
-                I agree to all the{' '}
-                <span className="text-blue-600 hover:underline cursor-pointer">Terms</span>
-                {' '}and{' '}
-                <span className="text-blue-600 hover:underline cursor-pointer">Privacy Policies</span>
-              </label>
+            <div>
+              <div className="flex items-start space-x-3">
+                <input
+                  type="checkbox"
+                  id="terms"
+                  checked={formData.agreeToTerms}
+                  onChange={(e) => handleInputChange('agreeToTerms', e.target.checked)}
+                  className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <label htmlFor="terms" className="text-sm text-gray-600">
+                  I agree to all the{' '}
+                  <span className="text-blue-600 hover:underline cursor-pointer">Terms</span>
+                  {' '}and{' '}
+                  <span className="text-blue-600 hover:underline cursor-pointer">Privacy Policies</span>
+                </label>
+              </div>
+              {fieldErrors.agreeToTerms && (
+                <p className="mt-1 text-sm text-red-600">{fieldErrors.agreeToTerms}</p>
+              )}
             </div>
 
             {/* Register Button */}
