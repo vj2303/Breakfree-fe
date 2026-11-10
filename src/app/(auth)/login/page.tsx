@@ -134,6 +134,15 @@ export default function Login() {
             </p>
           </div>
 
+          {/* Demo credentials, shown on screen so a demo session needs no handover note. */}
+          <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-center">
+            <p className="text-sm text-blue-900">
+              <span className="font-semibold">Demo login</span> — username:{' '}
+              <span className="font-mono font-semibold">demo</span> · password:{' '}
+              <span className="font-mono font-semibold">test@123</span>
+            </p>
+          </div>
+
           <form onSubmit={handleLogin} className="space-y-6">
             {/* Email or Username */}
             <div>
