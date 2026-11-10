@@ -39,7 +39,7 @@ export default function JoinUs() {
     // Navigate to different register pages based on account type
     switch (accountType) {
       case 'admin':
-        router.push('/register')
+        router.push('/login')
         break
       case 'assessor':
         router.push('/assessor/login')
