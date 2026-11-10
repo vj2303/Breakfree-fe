@@ -134,9 +134,21 @@ export function mean(values: Array<number | null>): number | null {
   return present.reduce((a, b) => a + b, 0) / present.length;
 }
 
+/**
+ * The one rounding rule for every figure on screen.
+ *
+ * `toFixed` rounds on the binary value, so 3.45 and 4.05 went opposite ways
+ * and a column of displayed numbers did not add up to the displayed total.
+ * Scaling with a one-ULP nudge makes it half-up for every input.
+ */
+export function roundToDisplay(value: number, digits = 1): number {
+  const factor = 10 ** digits;
+  return Math.round(value * factor * (1 + Number.EPSILON)) / factor;
+}
+
 export function formatScore(value: number | null, digits = 1): string {
   if (value === null || Number.isNaN(value)) return '—';
-  return value.toFixed(digits);
+  return roundToDisplay(value, digits).toFixed(digits);
 }
 
 /** Every comment an assessor left on a competency in one activity, keyed by sub-competency. */

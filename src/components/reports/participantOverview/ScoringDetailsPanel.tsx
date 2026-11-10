@@ -11,6 +11,7 @@ import {
   competencyMax,
   formatScore,
   mean,
+  roundToDisplay,
 } from './scoring';
 import type { AssessorRecord, OverviewActivity, OverviewCompetency } from './types';
 
@@ -48,9 +49,14 @@ export default function ScoringDetailsPanel({
   const activeActivity = activities.find((a) => a.activityId === activeTab) ?? null;
 
   /** Activities in scope for the current tab — one, or all of them on the overall tab. */
-  const scopedActivityIds = useMemo(
-    () => (isOverall ? activities.map((a) => a.activityId) : activeActivity ? [activeActivity.activityId] : []),
+  const activitiesInScope = useMemo(
+    () => (isOverall ? activities : activeActivity ? [activeActivity] : []),
     [isOverall, activities, activeActivity]
+  );
+
+  const scopedActivityIds = useMemo(
+    () => activitiesInScope.map((activity) => activity.activityId),
+    [activitiesInScope]
   );
 
   const rows: ScoreRow[] = useMemo(() => {
@@ -61,14 +67,23 @@ export default function ScoringDetailsPanel({
     return scoped.map((competency) => {
       const competencyIndex = competencies.findIndex((c) => c.id === competency.id);
 
-      const maxes = scopedActivityIds
+      // An exercise that does not assess this competency must not contribute
+      // to its maximum or its average. The centre's own configuration says
+      // which competencies an exercise covers; inferring it from the rubric
+      // counted an uncovered exercise as a 10-point numeric row, which is what
+      // pushed maxima above 5.
+      const assessingActivityIds = activitiesInScope
+        .filter((activity) => activity.competencyIds.includes(competency.id))
+        .map((activity) => activity.activityId);
+
+      const maxes = assessingActivityIds
         .map((activityId) => competencyMax(descriptors, activityId, competency))
         .filter((m) => m > 0);
       const max = maxes.length > 0 ? maxes.reduce((a, b) => a + b, 0) / maxes.length : 0;
 
       const perAssessor = assessors.map((assessor) =>
         isOverall
-          ? assessorCompetencyAverage(assessor, scopedActivityIds, competency)
+          ? assessorCompetencyAverage(assessor, assessingActivityIds, competency)
           : activeActivity
             ? assessorCompetencyScore(assessor, activeActivity.activityId, competency)
             : null
@@ -82,7 +97,7 @@ export default function ScoringDetailsPanel({
         finalScore: mean(perAssessor),
       };
     });
-  }, [isOverall, competencies, activeActivity, scopedActivityIds, assessors, descriptors]);
+  }, [isOverall, competencies, activeActivity, activitiesInScope, assessors, descriptors]);
 
   const moderatorValue = (competencyId: string, finalScore: number | null): string => {
     const key = `${activeTab}|${competencyId}`;
@@ -91,20 +106,26 @@ export default function ScoringDetailsPanel({
   };
 
   const totals = useMemo(() => {
+    // Add the rounded figures, not the raw ones: a column of displayed numbers
+    // has to add up to the displayed total.
     const sum = (values: Array<number | null>) =>
       values.some((v) => v !== null)
-        ? values.reduce<number>((acc, v) => acc + (v ?? 0), 0)
+        ? roundToDisplay(
+            values.reduce<number>((acc, v) => acc + (v === null ? 0 : roundToDisplay(v)), 0)
+          )
         : null;
 
     return {
-      max: rows.reduce((acc, row) => acc + row.max, 0),
+      max: roundToDisplay(rows.reduce((acc, row) => acc + roundToDisplay(row.max), 0)),
       perAssessor: assessors.map((_, index) => sum(rows.map((row) => row.perAssessor[index]))),
       finalScore: sum(rows.map((row) => row.finalScore)),
-      moderator: rows.reduce((acc, row) => {
-        const raw = moderatorValue(row.competency.id, row.finalScore);
-        const parsed = parseFloat(raw);
-        return acc + (Number.isNaN(parsed) ? 0 : parsed);
-      }, 0),
+      moderator: roundToDisplay(
+        rows.reduce((acc, row) => {
+          const raw = moderatorValue(row.competency.id, row.finalScore);
+          const parsed = parseFloat(raw);
+          return acc + (Number.isNaN(parsed) ? 0 : parsed);
+        }, 0)
+      ),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, assessors, moderatorScores, activeTab]);
