@@ -37,11 +37,15 @@ export default function Login() {
       return
     }
 
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(formData.email)) {
-      showError('Please enter a valid email address')
-      return
+    // The identifier can be an email address or a username. Only validate the
+    // email format when it looks like an email (contains "@").
+    const identifier = formData.email.trim()
+    if (identifier.includes('@')) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(identifier)) {
+        showError('Please enter a valid email address')
+        return
+      }
     }
 
     setIsLoading(true)
@@ -131,16 +135,16 @@ export default function Login() {
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
-            {/* Email Address */}
+            {/* Email or Username */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address*
+                Email or Username*
               </label>
               <input
-                type="email"
+                type="text"
                 value={formData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
-                placeholder="Enter your email address"
+                placeholder="Enter your email or username"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-black transition-all duration-200"
                 required
                 disabled={isLoading}
