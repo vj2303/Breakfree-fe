@@ -177,14 +177,15 @@ export default function HomeDashboard() {
       (s) => new Date(s.updatedAt || s.createdAt).getTime() >= startOfThisMonth.getTime()
     ).length;
 
+    // One measure, used by the headline and the caption alike: participants
+    // who have submitted every activity assigned to them. Previously the
+    // headline averaged each participant's percentage (90%) while the caption
+    // counted those fully finished (2 of 3 = 67%), so the tile argued with
+    // itself and with the group cards.
     const allProgress = Array.from(progressById.values()).filter((p) => p.total > 0);
+    const finishedCount = allProgress.filter((p) => p.complete).length;
     const completionRate =
-      allProgress.length > 0
-        ? Math.round(
-            (allProgress.reduce((sum, p) => sum + p.submitted / p.total, 0) / allProgress.length) *
-              100
-          )
-        : 0;
+      allProgress.length > 0 ? Math.round((finishedCount / allProgress.length) * 100) : 0;
 
     return [
       {
@@ -195,22 +196,24 @@ export default function HomeDashboard() {
       },
       {
         id: 'assessed',
-        label: 'Candidates assessed',
+        label: 'Candidates scored',
         value: String(assessedParticipants.size),
         delta: thisMonth > 0 ? { direction: 'up', text: `${thisMonth}` } : null,
-        caption: thisMonth > 0 ? 'this month' : `of ${participants.length} participants`,
+        // The caption used to change meaning with the data; it now always
+        // says what the headline is a count of.
+        caption: `of ${participants.length} participants scored by an assessor`,
       },
       {
         id: 'completion',
-        label: 'Avg. completion rate',
+        label: 'Participants finished',
         value: `${completionRate}%`,
-        caption: `${allProgress.filter((p) => p.complete).length} of ${allProgress.length} finished`,
+        caption: `${finishedCount} of ${allProgress.length} submitted every activity`,
       },
       {
         id: 'awaiting',
-        label: 'Reports awaiting release',
+        label: 'Scores awaiting release',
         value: String(awaitingRelease),
-        caption: awaitingRelease > 0 ? 'needs review' : 'all released',
+        caption: awaitingRelease > 0 ? 'submitted, not yet released' : 'all released',
         needsAttention: awaitingRelease > 0,
       },
       {
@@ -341,16 +344,37 @@ export default function HomeDashboard() {
     const entries: ActivityEntry[] = [];
 
     scores.forEach((score) => {
-      const stamp = new Date(score.updatedAt || score.createdAt).getTime();
+      // The scores endpoint pads its results with placeholder rows for
+      // allocations nobody has opened (status NOT_STARTED, synthetic id, no
+      // marks). They are not activity, and listing them claimed an assessor
+      // had submitted scores that do not exist anywhere.
+      const status = score.status as string | undefined;
+      const isPlaceholder =
+        score.isSynthetic === true ||
+        String(score.id || '').startsWith('synthetic_') ||
+        status === 'NOT_STARTED' ||
+        !status;
+      if (isPlaceholder) return;
+
+      const submitted = status === 'SUBMITTED' || status === 'FINALIZED';
+
+      // submittedAt is when the work actually happened. updatedAt moves every
+      // time the row is touched — a later edit or a re-run of AI suggestions
+      // made a two-week-old submission read as "2 days ago".
+      const raw = submitted
+        ? score.submittedAt || score.createdAt
+        : score.createdAt;
+      const stamp = new Date(raw).getTime();
       if (Number.isNaN(stamp)) return;
+
       const participantName = score.participant?.name || 'a participant';
       const assessorName = score.assessor?.name || 'An assessor';
+
       entries.push({
         id: `score-${score.id}`,
-        title:
-          score.status === 'DRAFT'
-            ? `${assessorName} started scoring ${participantName}`
-            : `${assessorName} submitted scores for ${participantName}`,
+        title: submitted
+          ? `${assessorName} submitted scores for ${participantName}`
+          : `${assessorName} started scoring ${participantName}`,
         meta: `${relativeTime(stamp, now)}${
           score.assessmentCenter?.name ? ` · ${score.assessmentCenter.name}` : ''
         }`,
