@@ -283,9 +283,6 @@ export function buildProgressPoints(
   const score = (value: unknown): number | null =>
     typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
 
-  const num = (value: unknown): number | null =>
-    typeof value === 'number' && Number.isFinite(value) ? value : null;
-
   const delta = (post: number | null, pre: number | null): number | null =>
     post === null || pre === null ? null : Number((post - pre).toFixed(2));
 
@@ -293,16 +290,26 @@ export function buildProgressPoints(
     const pp = prePostById.get(competency.id) || {};
     const ar = readinessById.get(competency.id) || {};
 
-    const preApplication = score(pp.preAssessmentApp);
-    // The fallbacks only work if a 0 reads as absent: with `num` the first
-    // term was 0 rather than null, so the real figure was never reached.
-    const postApplication = score(pp.preAssessmentApp2) ?? score(ar.applicationAverage);
-    const postReadiness = score(pp.postAssessmentReadiness) ?? score(ar.readiness);
-    const improvement = num(pp.improvement);
-    const preReadiness =
-      postReadiness !== null && improvement !== null
-        ? score(Number((postReadiness - improvement).toFixed(2)))
-        : score(ar.readiness);
+    /**
+     * Readiness and Application are separate instruments, so each column is
+     * read from its own source and nothing is derived from the other.
+     *
+     * Readiness    — the uploaded psychometric / SJT sheet. Pre and Post are
+     *                its own two columns; with no pre/post sheet uploaded, the
+     *                single readiness snapshot is the current (post) figure and
+     *                there is no baseline.
+     * Application  — the assessors' BARS marking. A pre figure exists only when
+     *                there were two distinct submissions.
+     *
+     * Previously Pre Readiness was back-calculated as `postReadiness -
+     * improvement`, which collapsed to the Pre Application value, and Post
+     * Readiness fell back to an assessor BARS average — so a Readiness column
+     * showed another participant's assessor ratings.
+     */
+    const preReadiness = score(pp.preReadiness);
+    const postReadiness = score(pp.postReadiness) ?? score(ar.readiness);
+    const preApplication = score(pp.preApplication);
+    const postApplication = score(pp.postApplication) ?? score(ar.applicationAverage);
 
     return {
       code: competency.code,

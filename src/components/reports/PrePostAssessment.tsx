@@ -22,11 +22,18 @@ interface PrePostAssessmentProps {
 interface CompetencyData {
   competencyId: string;
   competencyName: string;
-  preAssessmentApp: number;
-  preAssessmentApp2: number;
-  improvement: number;
-  postAssessmentReadiness: number;
+  // null where that source recorded nothing for this competency.
+  preAssessmentApp: number | null;
+  preAssessmentApp2: number | null;
+  improvement: number | null;
+  postAssessmentReadiness: number | null;
 }
+
+/** An unmeasured score is shown as such, never as a blank cell or a 0. */
+const NoData = () => <span className="text-gray-400">No data</span>;
+
+const cell = (value: number | null) =>
+  typeof value === 'number' && Number.isFinite(value) ? value.toFixed(1) : <NoData />;
 
 const PrePostAssessment: React.FC<PrePostAssessmentProps> = ({
   participantId,
@@ -153,12 +160,14 @@ const PrePostAssessment: React.FC<PrePostAssessmentProps> = ({
               {tableData.map((row, index) => (
                 <tr key={index} className="border-b border-gray-200">
                   <td className="py-3 px-4 text-sm text-black">{row.competency}</td>
-                  <td className="py-3 px-4 text-sm text-black">{row.preAssessmentApp}</td>
-                  <td className="py-3 px-4 text-sm text-black">{row.preAssessmentApp2}</td>
+                  <td className="py-3 px-4 text-sm text-black">{cell(row.preAssessmentApp)}</td>
+                  <td className="py-3 px-4 text-sm text-black">{cell(row.preAssessmentApp2)}</td>
                   <td className="py-3 px-4 text-sm text-black font-medium bg-gray-100">
-                    {row.improvement}
+                    {cell(row.improvement)}
                   </td>
-                  <td className="py-3 px-4 text-sm text-black">{row.postAssessmentReadiness}</td>
+                  <td className="py-3 px-4 text-sm text-black">
+                    {cell(row.postAssessmentReadiness)}
+                  </td>
                 </tr>
               ))}
             </tbody>
