@@ -430,41 +430,42 @@ export default function AssessmentInsights({ token }: AssessmentInsightsProps) {
 
   const selectedCenterName = centers.find((c) => c.id === centerFilter)?.name || '';
 
-  const exportCsv = () => {
-    const header = [
-      'Competency',
-      'N',
-      'Readiness change',
-      'Application change',
-      'Assessors',
-    ];
-    const lines = tableRows.map((row) =>
-      [
-        `"${row.code} — ${row.competencyName.replace(/"/g, '""')}"`,
-        row.n,
-        row.readinessDelta === null ? '' : row.readinessDelta.toFixed(1),
-        row.applicationDelta === null ? '' : row.applicationDelta.toFixed(1),
-        `"${Array.from(
-          new Set(
-            (row.trace?.participants ?? []).flatMap((entry) =>
-              entry.assessors.filter((a) => a.score !== null).map((a) => a.assessorName)
-            )
-          )
-        )
-          .sort()
-          .join('; ')
-          .replace(/"/g, '""')}"`,
-      ].join(',')
-    );
-    const blob = new Blob([[header.join(','), ...lines].join('\n')], {
-      type: 'text/csv;charset=utf-8;',
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `assessment-insights-${selectedCenterName || 'report'}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  /** Downloads what is on screen, for the filters in force, as a workbook. */
+  const handleExport = async () => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const { exportInsightsWorkbook } = await import('./exportWorkbook');
+      await exportInsightsWorkbook({
+        filters: {
+          cohort: groups.find((g) => g.id === groupFilter)?.name || 'All cohorts',
+          assessment: selectedCenterName,
+          designation: designationFilter === ALL ? 'All designations' : designationFilter,
+          period:
+            PERIOD_OPTIONS.find((option) => option.value === periodFilter)?.label || 'All time',
+        },
+        competencies,
+        tableRows,
+        rollups: visibleRollups.map((entry) => ({
+          participant: entry.participant,
+          completed: entry.completed,
+          scored: entry.scored,
+          lastActivityAt: entry.lastActivityAt,
+          points: entry.points,
+          trace: entry.trace,
+        })),
+        completedCount,
+        scoredCount,
+      });
+    } catch (err) {
+      console.error('Error exporting assessment insights:', err);
+      setExportError('Could not build the Excel file. Please try again.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   if (scaffoldLoading) {
@@ -488,15 +489,23 @@ export default function AssessmentInsights({ token }: AssessmentInsightsProps) {
             {reportYear && <> · {reportYear}</>}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={exportCsv}
-          disabled={tableRows.length === 0}
-          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-black transition-colors hover:bg-gray-50 disabled:opacity-50"
-        >
-          <Download className="h-4 w-4" />
-          Export
-        </button>
+        <div className="flex flex-col items-end gap-1">
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={tableRows.length === 0 || exporting}
+            title="Download the figures on screen as an Excel workbook"
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-black transition-colors hover:bg-gray-50 disabled:opacity-50"
+          >
+            {exporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {exporting ? 'Preparing…' : 'Export to Excel'}
+          </button>
+          {exportError && <span className="text-xs text-red-600">{exportError}</span>}
+        </div>
       </div>
 
       <InsightsFilterBar
