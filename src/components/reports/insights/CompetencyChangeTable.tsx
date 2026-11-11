@@ -24,19 +24,28 @@ const COLUMN_COUNT = 8;
 
 /** Plain average, one decimal. */
 function Score({ value }: { value: number | null }) {
-  return (
-    <span
-      className={`text-sm tabular-nums ${value === null ? 'text-gray-300' : 'text-gray-900'}`}
-    >
-      {formatScore(value)}
-    </span>
-  );
+  // A stage with no score says so. A bare dash reads as nought, and the
+  // report must never imply a participant scored zero when they have simply
+  // not sat that assessment yet.
+  if (value === null || Number.isNaN(value)) {
+    return <span className="text-xs leading-tight text-gray-400">Not yet assessed</span>;
+  }
+  return <span className="text-sm tabular-nums text-gray-900">{formatScore(value)}</span>;
 }
 
 /** Signed, one-decimal delta. Negative changes drop back to gray so gains read first. */
 function Delta({ value }: { value: number | null }) {
+  // Only shown when both a pre and a post score exist; otherwise there is
+  // nothing to subtract and inventing one would misreport progress.
   if (value === null || Number.isNaN(value)) {
-    return <span className="text-sm text-gray-300">—</span>;
+    return (
+      <span
+        className="text-xs text-gray-400"
+        title="A difference needs both a pre-assessment and a post-assessment score"
+      >
+        —
+      </span>
+    );
   }
   const text = `${value > 0 ? '+' : value < 0 ? '−' : '+'}${Math.abs(value).toFixed(1)}`;
   return (
