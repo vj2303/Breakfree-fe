@@ -130,6 +130,86 @@ export default function ScoringDetailsPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, assessors, moderatorScores, activeTab]);
 
+  /**
+   * Every assessor comment in scope, grouped by competency, so an admin can
+   * read the whole picture for a tab without opening each row's icon. The
+   * per-row icon stays for reading one competency in place.
+   *
+   * On an activity tab the activity is implied, so it is left off each entry;
+   * on the overall tab the same competency carries comments from several
+   * activities, so each one is labelled.
+   */
+  const commentGroups = useMemo(() => {
+    return rows
+      .map((row) => {
+        const entries: Array<{
+          assessorName: string;
+          activityName: string | null;
+          subCompetency: string;
+          comment: string;
+        }> = [];
+
+        // Deliberately not filtered by the activity's configured competencies:
+        // a comment that exists is evidence an assessor recorded, and skipping
+        // it because the centre's configuration does not list that pairing
+        // would silently hide real feedback. Groups that end up empty are
+        // dropped below, so nothing shows a heading with no content.
+        activitiesInScope.forEach((activity) => {
+          assessors.forEach((assessor) => {
+            assessorCompetencyComments(assessor, activity.activityId, row.competency).forEach(
+              ({ subCompetency, comment }) => {
+                entries.push({
+                  assessorName: assessor.name,
+                  activityName: isOverall ? activity.name : null,
+                  subCompetency,
+                  comment,
+                });
+              }
+            );
+          });
+        });
+
+        return { competency: row.competency, competencyIndex: row.competencyIndex, entries };
+      })
+      .filter((group) => group.entries.length > 0);
+  }, [rows, activitiesInScope, assessors, isOverall]);
+
+  /**
+   * Comments an assessor left on the activity as a whole, or on the submission
+   * overall, rather than against a competency. They are assessor feedback too,
+   * and are otherwise unreachable from this screen.
+   */
+  const generalComments = useMemo(() => {
+    const out: Array<{
+      assessorName: string;
+      label: string;
+      comment: string;
+    }> = [];
+
+    assessors.forEach((assessor) => {
+      activitiesInScope.forEach((activity) => {
+        const comment = assessor.activityComments?.[activity.activityId];
+        if (comment && comment.trim()) {
+          out.push({
+            assessorName: assessor.name,
+            label: isOverall ? activity.name : 'This activity',
+            comment: comment.trim(),
+          });
+        }
+      });
+
+      if (isOverall && assessor.overallComments && assessor.overallComments.trim()) {
+        out.push({
+          assessorName: assessor.name,
+          label: 'Overall',
+          comment: assessor.overallComments.trim(),
+        });
+      }
+    });
+
+    return out;
+  }, [assessors, activitiesInScope, isOverall]);
+
   const tabs = [
     ...activities.map((activity) => ({ id: activity.activityId, label: activity.name })),
     { id: OVERALL_TAB, label: 'Overall competency average' },
@@ -345,6 +425,74 @@ export default function ScoringDetailsPanel({
             </tbody>
           </table>
         </div>
+      )}
+
+      {assessors.length > 0 && (
+        <section className="mt-8 border-t border-gray-200 pt-6">
+          <h4 className="text-sm font-bold text-black">Assessor Comments</h4>
+          <p className="mt-0.5 text-xs text-gray-500">
+            {isOverall
+              ? 'Every comment recorded across all activities, grouped by competency.'
+              : `Comments recorded for ${activeActivity?.name ?? 'this activity'}, grouped by competency.`}
+          </p>
+
+          {commentGroups.length === 0 && generalComments.length === 0 ? (
+            <p className="mt-4 rounded-xl border border-dashed border-gray-200 py-8 text-center text-sm text-gray-400">
+              No comments recorded.
+            </p>
+          ) : (
+            <div className="mt-4 space-y-5">
+              {commentGroups.map((group) => (
+                <div key={group.competency.id}>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[11px] font-bold ${badgeStyle(
+                        group.competencyIndex
+                      )}`}
+                    >
+                      {group.competency.code}
+                    </span>
+                    <span className="text-sm font-semibold text-black">
+                      {group.competency.label}
+                    </span>
+                  </div>
+
+                  <ul className="mt-2 space-y-2 border-l-2 border-gray-100 pl-3">
+                    {group.entries.map((entry, index) => (
+                      <li key={`${group.competency.id}-${index}`}>
+                        <p className="text-[11px] text-gray-500">
+                          <span className="font-semibold text-gray-700">{entry.assessorName}</span>
+                          {entry.activityName && <> · {entry.activityName}</>}
+                          {' · '}
+                          {entry.subCompetency}
+                        </p>
+                        <p className="text-sm leading-snug text-gray-800">{entry.comment}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+
+              {generalComments.length > 0 && (
+                <div>
+                  <span className="text-sm font-semibold text-black">General comments</span>
+                  <ul className="mt-2 space-y-2 border-l-2 border-gray-100 pl-3">
+                    {generalComments.map((entry, index) => (
+                      <li key={`general-${index}`}>
+                        <p className="text-[11px] text-gray-500">
+                          <span className="font-semibold text-gray-700">{entry.assessorName}</span>
+                          {' · '}
+                          {entry.label}
+                        </p>
+                        <p className="text-sm leading-snug text-gray-800">{entry.comment}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
       )}
     </div>
   );
