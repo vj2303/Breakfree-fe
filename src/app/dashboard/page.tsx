@@ -22,7 +22,9 @@ export default function Dashboard() {
     if (option === "ai-trainers") {
       router.push("/dashboard/ai-trainer");
     } else if (option === "report-generation") {
-      router.push("/dashboard/report-generation/content");
+      // Home is the landing screen: it is the dashboard, and Content is a
+      // place you go to do a specific job, not where you start.
+      router.push("/dashboard/report-generation/home");
     }
   };
 
