@@ -1398,22 +1398,28 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
                 ).some((c) => c.id === competency.id)
               );
 
-              let average: number | null = storedAverages[competency.id] ?? null;
-              if (average === null) {
-                let sum = 0;
-                let count = 0;
-                carryingActivities.forEach((activity) => {
-                  const avg = averageSubCompetencyScores(
-                    competency.subCompetencyNames,
-                    activityCompetencyScores[activity.activityId]?.[competency.id]
-                  );
-                  if (avg !== null) {
-                    sum += avg;
-                    count++;
-                  }
-                });
-                average = count > 0 ? sum / count : null;
-              }
+              // The marks on screen are the source of truth, not the stored
+              // roll-up. That roll-up was written by an earlier version that
+              // divided by every sub-competency in the competency and counted
+              // an unscored one as nought, so a competency an exercise does not
+              // assess pulled the rating down — and the figure here disagreed
+              // with the one the report showed. Recomputing keeps the two in
+              // step and corrects submissions saved before the fix. The stored
+              // value is only used if nothing was scored locally.
+              let sum = 0;
+              let count = 0;
+              carryingActivities.forEach((activity) => {
+                const avg = averageSubCompetencyScores(
+                  competency.subCompetencyNames,
+                  activityCompetencyScores[activity.activityId]?.[competency.id]
+                );
+                if (avg !== null) {
+                  sum += avg;
+                  count++;
+                }
+              });
+              const average: number | null =
+                count > 0 ? sum / count : (storedAverages[competency.id] ?? null);
 
               // Points available per sub-competency, so the bar scales to the rubric in use.
               const maxes = competency.subCompetencyNames.map((subComp) => {

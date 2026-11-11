@@ -19,9 +19,8 @@ import TopCapabilityGaps from './components/TopCapabilityGaps';
 export default function InsightsPage() {
   const { user } = useAuth();
 
-  const userName =
-    [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Breakfree breakfree';
-  const userEmail = user?.email || 'breakfree@gmail.com';
+  const userName = [user?.firstName, user?.lastName].filter(Boolean).join(' ');
+  const userEmail = user?.email || '';
 
   return (
     <div className="flex min-h-screen flex-col">

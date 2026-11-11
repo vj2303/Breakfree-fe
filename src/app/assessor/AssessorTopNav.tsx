@@ -47,7 +47,7 @@ export default function AssessorTopNav() {
         <Link href="/assessor/dashboard" className="flex items-center gap-2.5">
           <span className="h-[11px] w-[11px] rounded-full bg-[var(--ap-navy)]" />
           <span className="text-[15px] font-bold tracking-[-0.01em] text-[var(--ap-ink)]">
-            BreakFree
+            Skill Insight AI
           </span>
         </Link>
 
