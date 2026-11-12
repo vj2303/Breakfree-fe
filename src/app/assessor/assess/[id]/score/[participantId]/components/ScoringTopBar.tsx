@@ -38,8 +38,20 @@ export interface ScoringTopBarProps {
   onSubmit: () => void;
 }
 
+/**
+ * Pills for a score that has not been submitted yet.
+ *
+ * Every competency carrying a score is not the same as the score being
+ * submitted. This read "Completed" in green the moment the last competency was
+ * marked, while the work was still a draft and Submit Scores was still live —
+ * so an assessor could leave believing they had filed it. "Ready to submit"
+ * says what is true and what is left to do.
+ */
 const PROGRESS_PILL: Record<ProgressStatus, { label: string; className: string }> = {
-  completed: { label: 'Completed', className: 'border-green-200 bg-green-50 text-green-700' },
+  completed: {
+    label: 'Ready to submit',
+    className: 'border-violet-200 bg-violet-50 text-violet-700',
+  },
   in_progress: { label: 'In Progress', className: 'border-amber-200 bg-amber-50 text-amber-700' },
   not_started: { label: 'Not Started', className: 'border-gray-200 bg-gray-50 text-gray-600' },
 };

@@ -274,7 +274,14 @@ export default function AssessmentInsights({ token }: AssessmentInsightsProps) {
         const prePostJson = prePostRes.ok ? await prePostRes.json() : null;
         const readinessJson = readinessRes.ok ? await readinessRes.json() : null;
 
-        const scores: RawRecord[] = scoresJson?.data?.scores || [];
+        // Submitted work only. A draft is an assessor's unfinished private
+        // workings: counting it made a participant "scored" before anyone had
+        // filed anything, and listed a draft assessor as provenance for
+        // figures that deliberately exclude them — the figures themselves come
+        // from endpoints that already take SUBMITTED and FINALIZED alone.
+        const scores: RawRecord[] = (scoresJson?.data?.scores || []).filter(
+          (score: RawRecord) => score.status === 'SUBMITTED' || score.status === 'FINALIZED'
+        );
         const scoredActivityIds = new Set<string>();
         scores.forEach((score) => {
           Object.keys(score.activityCompetencyScores || {}).forEach((activityId) => {
