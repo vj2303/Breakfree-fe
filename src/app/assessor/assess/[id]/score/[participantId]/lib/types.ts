@@ -118,6 +118,8 @@ export interface AssessorScore {
    * competencyId -> average score across all activities for that competency
    */
   competencyAverages?: Record<string, number>;
+  /** `activityId -> observations`, as saved with the score. */
+  observations?: Record<string, unknown>;
   /**
    * activityId -> competencyId -> subCompetency -> selectedScoreKey
    * Stores which rubric level/tick mark was selected (e.g., "score1", "score2")

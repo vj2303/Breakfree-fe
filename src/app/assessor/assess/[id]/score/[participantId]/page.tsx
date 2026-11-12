@@ -26,6 +26,8 @@ import {
 import {
   createObservationId,
   observationsForSubCompetency,
+  observationsFromSuggestions,
+  parseStoredObservations,
   summarizeObservations,
 } from './lib/observations';
 import type { Observation, ObservationsByActivity } from './lib/observations';
@@ -144,7 +146,7 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [draftStatus, setDraftStatus] = useState<'DRAFT' | 'SUBMITTED' | null>(null);
 
-  /** Assessor observations against the evidence. Held in the UI only — never sent to the API. */
+  /** Observations against the evidence, from the assessor and from AI suggestions. */
   const [observations, setObservations] = useState<ObservationsByActivity>({});
   /**
    * Report descriptor overrides, keyed `activityId|competencyId|subCompetency`.
@@ -407,6 +409,15 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
         return acc;
       }, {}),
     }));
+
+    // Each suggestion's evidence quote is a statement taken from the
+    // submission and already tied to a sub-competency — an observation in all
+    // but name. Surfacing them here is what fills "Relevant observations" and
+    // the Observation Summary; the assessor's own notes are left untouched.
+    setObservations(prev => ({
+      ...prev,
+      [activityId]: observationsFromSuggestions(activityId, list, prev[activityId] || []),
+    }));
   };
 
   const loadAiSuggestions = async (activityId: string) => {
@@ -555,6 +566,15 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
             }));
           } else {
             console.log('No competencyAverages in API response for assignment:', assignmentId);
+          }
+          // Observations were saved with the score but never read back, so
+          // reopening a submission showed an empty Observation Summary and
+          // "No observations mapped" on every sub-competency.
+          if (assessorScore.observations) {
+            const restored = parseStoredObservations(assessorScore.observations);
+            if (Object.keys(restored).length > 0) {
+              setObservations(prev => ({ ...restored, ...prev }));
+            }
           }
           // Load activity selected score keys if available
           if (assessorScore.activitySelectedScoreKeys) {
@@ -809,6 +829,7 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
       competencyId: mapping?.competencyId ?? null,
       subCompetency: mapping?.subCompetency ?? null,
       createdAt: Date.now(),
+      source: 'assessor',
     };
     setObservations((prev) => ({
       ...prev,

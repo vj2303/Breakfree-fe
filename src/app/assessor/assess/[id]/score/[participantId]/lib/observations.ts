@@ -1,9 +1,12 @@
 /**
  * Assessor observations captured while reviewing a submission.
  *
- * These live in component state only — nothing here is sent to or read from the API.
- * They exist so the assessor can jot timestamped notes against the evidence and map
- * them to the sub-competency they support while scoring.
+ * Two things produce them: the assessor, jotting timestamped notes against the
+ * evidence and mapping them to the sub-competency they support; and the AI
+ * suggestion run, whose evidence quotes are already statements taken from the
+ * submission and already mapped to a sub-competency.
+ *
+ * They are saved with the score and restored when the submission is reopened.
  */
 
 export interface Observation {
@@ -16,6 +19,8 @@ export interface Observation {
   competencyId: string | null;
   subCompetency: string | null;
   createdAt: number;
+  /** Who produced it. AI ones are replaced wholesale by the next suggestion run. */
+  source: 'assessor' | 'ai';
 }
 
 /** `activityId -> observations` */
@@ -88,4 +93,75 @@ export function sortObservations(observations: Observation[]): Observation[] {
     if (a.timeSec === b.timeSec) return a.createdAt - b.createdAt;
     return a.timeSec - b.timeSec;
   });
+}
+
+/**
+ * Turns AI suggestions into observations.
+ *
+ * A suggestion already carries what an observation is — a statement taken from
+ * the submission, tied to one sub-competency — so the evidence the model quoted
+ * is surfaced in "Relevant observations" rather than being locked inside the
+ * suggestion box. Nothing is invented: a suggestion with no quote produces no
+ * observation.
+ *
+ * `existing` is preserved. Re-running suggestions replaces only the
+ * observations a previous run produced, so an assessor's own notes and their
+ * edits to them are never overwritten.
+ */
+export function observationsFromSuggestions(
+  activityId: string,
+  suggestions: Array<{
+    competencyId: string;
+    subCompetency: string;
+    evidenceQuote: string | null;
+    evidenceLocation: string | null;
+  }>,
+  existing: Observation[]
+): Observation[] {
+  const manual = existing.filter((o) => o.source !== 'ai');
+
+  const fromAi = suggestions
+    .filter((s) => s.evidenceQuote && s.evidenceQuote.trim())
+    .map<Observation>((s) => ({
+      id: createObservationId(),
+      activityId,
+      timeSec: null,
+      text: s.evidenceLocation?.trim()
+        ? `${s.evidenceQuote!.trim()} — ${s.evidenceLocation.trim()}`
+        : s.evidenceQuote!.trim(),
+      competencyId: s.competencyId,
+      subCompetency: s.subCompetency,
+      createdAt: Date.now(),
+      source: 'ai',
+    }));
+
+  // An assessor who already wrote the same sentence should not see it twice.
+  const manualText = new Set(manual.map((o) => o.text.trim().toLowerCase()));
+  return [...manual, ...fromAi.filter((o) => !manualText.has(o.text.trim().toLowerCase()))];
+}
+
+/** Rehydrates observations saved with a score, discarding anything malformed. */
+export function parseStoredObservations(raw: unknown): ObservationsByActivity {
+  if (!raw || typeof raw !== 'object') return {};
+  const out: ObservationsByActivity = {};
+
+  Object.entries(raw as Record<string, unknown>).forEach(([activityId, list]) => {
+    if (!Array.isArray(list)) return;
+    const parsed = list
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+      .filter((item) => typeof item.text === 'string' && item.text.trim().length > 0)
+      .map<Observation>((item) => ({
+        id: typeof item.id === 'string' && item.id ? item.id : createObservationId(),
+        activityId,
+        timeSec: typeof item.timeSec === 'number' && Number.isFinite(item.timeSec) ? item.timeSec : null,
+        text: String(item.text),
+        competencyId: typeof item.competencyId === 'string' ? item.competencyId : null,
+        subCompetency: typeof item.subCompetency === 'string' ? item.subCompetency : null,
+        createdAt: typeof item.createdAt === 'number' ? item.createdAt : Date.now(),
+        source: item.source === 'ai' ? 'ai' : 'assessor',
+      }));
+    if (parsed.length > 0) out[activityId] = parsed;
+  });
+
+  return out;
 }
