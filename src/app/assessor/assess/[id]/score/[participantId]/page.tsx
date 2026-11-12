@@ -46,6 +46,8 @@ import ProgressSidebar from './components/ProgressSidebar';
 import type { ProgressCompetency } from './components/ProgressSidebar';
 import ScoringForm from './components/ScoringForm';
 import type { ReportDescriptorState } from './components/ScoringForm';
+import ActivityRail from './components/ActivityRail';
+import type { RailActivity } from './components/ActivityRail';
 import ScoringTopBar from './components/ScoringTopBar';
 import type { TopBarActivity } from './components/ScoringTopBar';
 
@@ -881,10 +883,54 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
     });
   };
 
+  /**
+   * Activities in this assignment that still have unscored competencies.
+   * One submit files the whole assignment, so anything listed here would be
+   * filed empty and the screen locked to read-only afterwards.
+   */
+  const unscoredActivityNames = (assignmentId: string): string[] => {
+    const assignment = participantDetails?.data?.assignments.find(
+      a => a.assignmentId === assignmentId
+    );
+    if (!assignment) return [];
+    return assignment.activities
+      .filter(activity => {
+        const competencies = getCompetenciesForActivity(
+          activity.activityId,
+          activity.competency,
+          assignment.competencies
+        );
+        const { scored, total } = getActivityProgress(
+          competencies,
+          activitySelectedScoreKeys[activity.activityId],
+          activityCompetencyScores[activity.activityId]
+        );
+        return total > 0 && scored < total;
+      })
+      .map(activity => activity.displayName || activity.activityDetail.name);
+  };
+
   const submitScores = async (assignmentId: string, status: 'DRAFT' | 'SUBMITTED') => {
     if (!participantDetails?.data || !assessorId || !token) {
       setError('Missing required data for score submission');
       return;
+    }
+
+    // Saving a draft changes nothing irreversibly, so only a real submit asks.
+    if (status === 'SUBMITTED') {
+      const outstanding = unscoredActivityNames(assignmentId);
+      if (outstanding.length > 0) {
+        const name = participantDetails.data.participant.name;
+        const ok = window.confirm(
+          `${outstanding.length} ${
+            outstanding.length === 1 ? 'activity is' : 'activities are'
+          } not fully scored for ${name}:\n\n${outstanding.map(n => `  • ${n}`).join('\n')}\n\n` +
+            'Submitting files every activity in this assignment, including these, ' +
+            'and you will not be able to edit them afterwards.\n\n' +
+            'Submit anyway?'
+        );
+        if (!ok) return;
+      }
     }
 
     setIsSubmittingScore(true);
@@ -1241,7 +1287,9 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
           const activeCompetency = activityCompetencies[activeCompetencyIndex] ?? null;
 
           // Sorted copy — the state array must not be mutated during render.
-          const activityOptions: TopBarActivity[] = [...selectedAssignment.activities]
+          // One pass feeds both the header dropdown and the activity rail, so
+          // the two cannot show different progress for the same activity.
+          const railActivities: RailActivity[] = [...selectedAssignment.activities]
             .sort((a, b) => a.displayOrder - b.displayOrder)
             .map((activity) => {
               const competencies = getCompetenciesForActivity(
@@ -1257,12 +1305,20 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
               return {
                 activityId: activity.activityId,
                 label: activity.displayName || activity.activityDetail.name,
-                sublabel: `${readableActivityType(
+                typeLabel: readableActivityType(
                   activity.activityType,
                   activity.activityDetail.interactiveActivityType
-                )} · ${scored}/${total} competencies scored`,
+                ),
+                scored,
+                total,
               };
             });
+
+          const activityOptions: TopBarActivity[] = railActivities.map((activity) => ({
+            activityId: activity.activityId,
+            label: activity.label,
+            sublabel: `${activity.typeLabel} · ${activity.scored}/${activity.total} competencies scored`,
+          }));
 
           const selectedActivityWithSubs = selectedActivity as ActivityWithSubmissions | undefined;
           // Fall back to the single `submission` when the API omitted `allSubmissions`, so an
@@ -1522,6 +1578,14 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
                   onBack={() => router.back()}
                   onSaveDraft={() => submitScores(selectedAssignmentId, 'DRAFT')}
                   onSubmit={() => submitScores(selectedAssignmentId, 'SUBMITTED')}
+                />
+
+                <ActivityRail
+                  activities={railActivities}
+                  selectedActivityId={selectedActivityId}
+                  onSelectActivity={setSelectedActivityId}
+                  lifecycleStatus={lifecycleStatus}
+                  participantName={participantDetails.data.participant.name}
                 />
 
                 {error && (

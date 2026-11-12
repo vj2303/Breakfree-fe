@@ -76,7 +76,10 @@ export default function CandidateCard({
           />
         </div>
         <span className="whitespace-nowrap text-[11.5px] font-semibold text-[var(--ap-grey)]">
-          {done}/{total}
+          {/* Labelled because this counts what the participant has handed in,
+              not how much the assessor has scored — on a scoring list a bare
+              "2/3" reads as the latter. */}
+          {done}/{total} submitted
         </span>
       </div>
 
