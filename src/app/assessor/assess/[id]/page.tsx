@@ -117,7 +117,47 @@ function AssessmentDetailInner({ params }: AssessmentDetailProps) {
     return participants.map((entry) => {
       const score = (entry.assessorScore || null) as RawRecord | null;
       const scoreStatus = typeof score?.status === 'string' ? score.status : null;
-      const signedOff = scoreStatus === 'SUBMITTED' || scoreStatus === 'FINALIZED';
+      const activities: RawRecord[] = entry.activities || [];
+      const totalActivities = activities.length;
+
+      /**
+       * How many of this participant's activities this assessor has actually
+       * filed, from activityStatuses — the only trustworthy source here.
+       *
+       * An activity cannot be submitted until every competency on it is
+       * scored, so a submitted activity is a fully scored one. Counting
+       * competencies instead would need the centre's activity-to-competency
+       * map, which this screen does not load; using the single competency the
+       * response carries would under-count what an activity requires and
+       * overstate progress — which is how an unscored participant came to be
+       * offered Sign off.
+       *
+       * A record written before per-activity submission has no map: back then
+       * one Submit covered everything, so a submitted record counts as all.
+       */
+      const statuses = (score?.activityStatuses || null) as Record<string, string> | null;
+      const tracksActivityStatus = !!statuses && Object.keys(statuses).length > 0;
+      const legacySubmitted = scoreStatus === 'SUBMITTED' || scoreStatus === 'FINALIZED';
+
+      const scoredActivities = tracksActivityStatus
+        ? activities.filter((a: RawRecord) => statuses?.[a.activityId as string] === 'SUBMITTED')
+            .length
+        : legacySubmitted
+          ? totalActivities
+          : 0;
+
+      /** Any mark at all, so a part-scored draft reads as started. */
+      const marks = (score?.activityCompetencyScores || {}) as Record<string, unknown>;
+      const hasAnyMarks = Object.values(marks).some((byCompetency) =>
+        Object.values((byCompetency || {}) as Record<string, unknown>).some((subScores) =>
+          Object.values((subScores || {}) as Record<string, unknown>).some(
+            (value) => typeof value === 'number' && value > 0
+          )
+        )
+      );
+
+      const allScored = totalActivities > 0 && scoredActivities >= totalActivities;
+      const signedOff = scoreStatus === 'FINALIZED' || allScored;
 
       const stamps = (entry.activities || [])
         .map((activity: RawRecord) =>
@@ -130,26 +170,29 @@ function AssessmentDetailInner({ params }: AssessmentDetailProps) {
           ? null
           : Math.floor((now - lastSubmission) / (24 * 60 * 60 * 1000));
 
-      const firstActivity = (entry.activities || []).find((a: RawRecord) => a.submission);
-      const activityName =
-        firstActivity?.activityDetail?.name || firstActivity?.activityType || 'No submission yet';
-
       let status: CandidateStatus;
       let statusLabel: string;
       let actionLabel: string;
+
+      // Lateness used to decide the action, so an overdue participant was
+      // offered Sign off whether or not a single competency had been scored.
+      // Overdue is now only how the row is flagged; what the button offers
+      // comes from the scoring itself.
+      const started = scoredActivities > 0 || hasAnyMarks;
+      const isOverdue = !signedOff && waitingDays !== null && waitingDays > OVERDUE_DAYS;
 
       if (signedOff) {
         status = 'signed';
         statusLabel = 'Signed off';
         actionLabel = 'View report';
-      } else if (scoreStatus === 'DRAFT') {
-        status = 'progress';
-        statusLabel = 'In progress';
-        actionLabel = 'Continue';
-      } else if (waitingDays !== null && waitingDays > OVERDUE_DAYS) {
+      } else if (isOverdue) {
         status = 'overdue';
         statusLabel = 'Overdue';
-        actionLabel = 'Sign off';
+        actionLabel = started ? 'Continue scoring' : 'Start scoring';
+      } else if (started) {
+        status = 'progress';
+        statusLabel = 'Scoring in progress';
+        actionLabel = 'Continue scoring';
       } else {
         status = 'notstarted';
         statusLabel = 'Not started';
@@ -173,9 +216,11 @@ function AssessmentDetailInner({ params }: AssessmentDetailProps) {
         statusLabel,
         actionLabel,
         ghost: signedOff,
-        sub: `${activityName} · ${waitingText}`,
-        done: entry.submissionCount || 0,
-        total: entry.totalActivities || (entry.activities || []).length,
+        // The participant's own submissions are named as theirs, so they
+        // cannot be read as the assessor's progress.
+        sub: `${entry.submissionCount || 0}/${totalActivities} submitted by participant · ${waitingText}`,
+        done: scoredActivities,
+        total: totalActivities,
         signedOff,
         lastSubmission,
       };
