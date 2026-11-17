@@ -47,13 +47,24 @@ export interface ScoringTopBarProps {
  * so an assessor could leave believing they had filed it. "Ready to submit"
  * says what is true and what is left to do.
  */
+/**
+ * Every label is prefixed "Scoring:" because this badge sits beside the
+ * participant's submission. Unprefixed, "Not started" read as though the
+ * participant had not started, with their work plainly on screen.
+ */
 const PROGRESS_PILL: Record<ProgressStatus, { label: string; className: string }> = {
   completed: {
-    label: 'Ready to submit',
+    label: 'Scoring: Ready to submit',
     className: 'border-violet-200 bg-violet-50 text-violet-700',
   },
-  in_progress: { label: 'In Progress', className: 'border-amber-200 bg-amber-50 text-amber-700' },
-  not_started: { label: 'Not Started', className: 'border-gray-200 bg-gray-50 text-gray-600' },
+  in_progress: {
+    label: 'Scoring: In progress',
+    className: 'border-amber-200 bg-amber-50 text-amber-700',
+  },
+  not_started: {
+    label: 'Scoring: Not started',
+    className: 'border-gray-200 bg-gray-50 text-gray-600',
+  },
 };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -180,9 +191,9 @@ export default function ScoringTopBar({
 }: ScoringTopBarProps) {
   const pill =
     lifecycleStatus === 'FINALIZED'
-      ? { label: 'Finalized', className: 'border-blue-200 bg-blue-50 text-blue-700' }
+      ? { label: 'Scoring: Finalized', className: 'border-blue-200 bg-blue-50 text-blue-700' }
       : lifecycleStatus === 'SUBMITTED'
-        ? { label: 'Submitted', className: 'border-green-200 bg-green-50 text-green-700' }
+        ? { label: 'Scoring: Submitted', className: 'border-green-200 bg-green-50 text-green-700' }
         : PROGRESS_PILL[progressStatus];
 
   return (

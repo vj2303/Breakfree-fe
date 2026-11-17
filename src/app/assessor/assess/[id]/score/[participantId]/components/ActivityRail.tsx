@@ -25,24 +25,27 @@ export interface ActivityRailProps {
 
 type RailState = 'submitted' | 'ready' | 'in_progress' | 'not_started';
 
+/** Prefixed "Scoring:" for the same reason as the header badge — these cards
+ *  sit next to the participant's submissions, and an unprefixed "Not started"
+ *  read as though nothing had been handed in. */
 const STATE_STYLE: Record<RailState, { label: string; pill: string; icon: typeof Check }> = {
   submitted: {
-    label: 'Submitted',
+    label: 'Scoring: Submitted',
     pill: 'border-green-200 bg-green-50 text-green-700',
     icon: Check,
   },
   ready: {
-    label: 'Ready to submit',
+    label: 'Scoring: Ready to submit',
     pill: 'border-violet-200 bg-violet-50 text-violet-700',
     icon: Check,
   },
   in_progress: {
-    label: 'In progress',
+    label: 'Scoring: In progress',
     pill: 'border-amber-200 bg-amber-50 text-amber-700',
     icon: Loader2,
   },
   not_started: {
-    label: 'Not started',
+    label: 'Scoring: Not started',
     pill: 'border-gray-200 bg-gray-50 text-gray-600',
     icon: CircleDashed,
   },
@@ -107,21 +110,20 @@ export default function ActivityRail({
                   : 'border-gray-200 bg-white hover:bg-gray-50'
               }`}
             >
-              <span className="flex items-start justify-between gap-2">
-                <span className="min-w-0">
-                  <span className="block truncate text-xs font-semibold text-black">
-                    {activity.label}
-                  </span>
-                  <span className="block truncate text-[11px] text-gray-500">
-                    {activity.typeLabel}
-                  </span>
+              <span className="block min-w-0">
+                <span className="block truncate text-xs font-semibold text-black">
+                  {activity.label}
                 </span>
-                <span
-                  className={`flex flex-shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium ${style.pill}`}
-                >
-                  <Icon size={10} className={state === 'in_progress' ? 'animate-none' : ''} />
-                  {style.label}
+                <span className="block truncate text-[11px] text-gray-500">
+                  {activity.typeLabel}
                 </span>
+              </span>
+
+              <span
+                className={`inline-flex w-fit max-w-full items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium ${style.pill}`}
+              >
+                <Icon size={10} className="flex-shrink-0" />
+                <span className="truncate">{style.label}</span>
               </span>
 
               <span className="flex items-center gap-2">
