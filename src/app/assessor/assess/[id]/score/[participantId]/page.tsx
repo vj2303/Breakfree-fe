@@ -60,8 +60,8 @@ interface ParticipantScoringProps {
 const ACTIVITY_TYPE_LABELS: Record<string, string> = {
   GD: 'Group Discussion',
   GROUP_DISCUSSION: 'Group Discussion',
-  ROLEPLAY: 'Roleplay',
-  ROLE_PLAY: 'Roleplay',
+  ROLEPLAY: 'Role Play',
+  ROLE_PLAY: 'Role Play',
   SIMULATION: 'Simulation',
   CASE_STUDY: 'Case Study',
   INBOX_ACTIVITY: 'Inbox Activity',

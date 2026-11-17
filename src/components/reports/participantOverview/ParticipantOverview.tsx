@@ -163,7 +163,10 @@ export default function ParticipantOverview({
             (detail?.name as string) ||
             readableActivityType(activity.activityType || ''),
           description: readDescription(detail) || activity.displayInstructions || '',
-          activityType: activity.activityType || '',
+          // A role play and a group discussion are both stored as case studies;
+          // interactiveActivityType is the only thing that tells them apart.
+          activityType:
+            (detail?.interactiveActivityType as string) || activity.activityType || '',
           competencyIds: competencyIdsByActivity.get(activityId) || [],
         });
       });
@@ -215,7 +218,11 @@ export default function ParticipantOverview({
               activity.activityDetail?.name ||
               readableActivityType(activity.activityType || ''),
             description: configured?.description || readDescription(detail),
-            activityType: activity.activityType || configured?.activityType || '',
+            activityType:
+              (detail?.interactiveActivityType as string) ||
+              activity.activityType ||
+              configured?.activityType ||
+              '',
             durationMinutes: readDuration(detail),
             assessors: assessorRecords
               .filter((assessor) => Boolean(assessor.activityCompetencyScores?.[activityId]))
