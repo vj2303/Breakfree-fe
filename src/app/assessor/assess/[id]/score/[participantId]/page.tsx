@@ -36,6 +36,7 @@ import type {
   ActivityWithSubmissions,
   EvaluationResponse,
   ParticipantDetails,
+  ScoreLifecycleStatus,
   SubmissionRecord,
 } from './lib/types';
 import EvaluationResults from './components/EvaluationResults';
@@ -120,6 +121,8 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
   const [activityCompetencyScores, setActivityCompetencyScores] = useState<Record<string, Record<string, Record<string, number>>>>({}); // activityId -> competencyId -> subCompetency -> score
   const [isSubmittingScore, setIsSubmittingScore] = useState(false);
   const [scoreStatus, setScoreStatus] = useState<Record<string, 'DRAFT' | 'SUBMITTED' | 'FINALIZED'>>({}); // assignmentId -> status
+  /** activityId -> 'SUBMITTED'. An activity missing here is still a draft. */
+  const [activityStatuses, setActivityStatuses] = useState<Record<string, 'SUBMITTED'>>({});
   const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [assessmentCenterId, setAssessmentCenterId] = useState<string | null>(null);
@@ -578,6 +581,23 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
               setObservations(prev => ({ ...restored, ...prev }));
             }
           }
+          // Which activities have actually been submitted. A record saved
+          // before per-activity submission has no map; back then one Submit
+          // covered everything, so the row's own status stands for them all.
+          if (assessorScore.activityStatuses && typeof assessorScore.activityStatuses === 'object') {
+            const incoming = assessorScore.activityStatuses as Record<string, string>;
+            const submitted: Record<string, 'SUBMITTED'> = {};
+            Object.entries(incoming).forEach(([activityId, value]) => {
+              if (value === 'SUBMITTED') submitted[activityId] = 'SUBMITTED';
+            });
+            setActivityStatuses(prev => ({ ...prev, ...submitted }));
+          } else if (assessorScore.status === 'SUBMITTED' || assessorScore.status === 'FINALIZED') {
+            const legacy: Record<string, 'SUBMITTED'> = {};
+            Object.keys(assessorScore.activityCompetencyScores || {}).forEach(activityId => {
+              legacy[activityId] = 'SUBMITTED';
+            });
+            setActivityStatuses(prev => ({ ...prev, ...legacy }));
+          }
           // Load activity selected score keys if available
           if (assessorScore.activitySelectedScoreKeys) {
             setActivitySelectedScoreKeys(prev => ({
@@ -883,31 +903,18 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
     });
   };
 
-  /**
-   * Activities in this assignment that still have unscored competencies.
-   * One submit files the whole assignment, so anything listed here would be
-   * filed empty and the screen locked to read-only afterwards.
-   */
-  const unscoredActivityNames = (assignmentId: string): string[] => {
+  /** Competency progress for one activity in an assignment. */
+  const activityProgressFor = (assignmentId: string, activityId: string) => {
     const assignment = participantDetails?.data?.assignments.find(
       a => a.assignmentId === assignmentId
     );
-    if (!assignment) return [];
-    return assignment.activities
-      .filter(activity => {
-        const competencies = getCompetenciesForActivity(
-          activity.activityId,
-          activity.competency,
-          assignment.competencies
-        );
-        const { scored, total } = getActivityProgress(
-          competencies,
-          activitySelectedScoreKeys[activity.activityId],
-          activityCompetencyScores[activity.activityId]
-        );
-        return total > 0 && scored < total;
-      })
-      .map(activity => activity.displayName || activity.activityDetail.name);
+    const activity = assignment?.activities.find(a => a.activityId === activityId);
+    if (!assignment || !activity) return { scored: 0, total: 0 };
+    return getActivityProgress(
+      getCompetenciesForActivity(activity.activityId, activity.competency, assignment.competencies),
+      activitySelectedScoreKeys[activity.activityId],
+      activityCompetencyScores[activity.activityId]
+    );
   };
 
   const submitScores = async (assignmentId: string, status: 'DRAFT' | 'SUBMITTED') => {
@@ -916,21 +923,52 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
       return;
     }
 
-    // Saving a draft changes nothing irreversibly, so only a real submit asks.
+    // Submitting files only the activity on screen. Everything else stays a
+    // draft the assessor can still come back to, so one click can no longer
+    // file activities nobody has scored.
+    const assignmentForSubmit = participantDetails.data.assignments.find(
+      a => a.assignmentId === assignmentId
+    );
+    const submittingActivity = assignmentForSubmit?.activities.find(
+      a => a.activityId === selectedActivityId
+    );
+
     if (status === 'SUBMITTED') {
-      const outstanding = unscoredActivityNames(assignmentId);
-      if (outstanding.length > 0) {
-        const name = participantDetails.data.participant.name;
-        const ok = window.confirm(
-          `${outstanding.length} ${
-            outstanding.length === 1 ? 'activity is' : 'activities are'
-          } not fully scored for ${name}:\n\n${outstanding.map(n => `  • ${n}`).join('\n')}\n\n` +
-            'Submitting files every activity in this assignment, including these, ' +
-            'and you will not be able to edit them afterwards.\n\n' +
-            'Submit anyway?'
-        );
-        if (!ok) return;
+      if (!submittingActivity) {
+        setError('Choose an activity before submitting.');
+        return;
       }
+
+      const activityName =
+        submittingActivity.displayName || submittingActivity.activityDetail.name;
+      const { scored, total } = activityProgressFor(assignmentId, submittingActivity.activityId);
+
+      // An unscored competency is "not yet scored", never a zero, so it is
+      // not filed at all — the assessor is told what is still missing.
+      if (total > 0 && scored < total) {
+        setError(
+          `"${activityName}" has ${total - scored} of ${total} competencies still unscored. ` +
+            'Score them, or use Save Draft to come back to it.'
+        );
+        return;
+      }
+
+      const remaining = (assignmentForSubmit?.activities || [])
+        .filter(a => a.activityId !== submittingActivity.activityId)
+        .filter(a => activityStatuses[a.activityId] !== 'SUBMITTED')
+        .map(a => a.displayName || a.activityDetail.name);
+
+      const ok = window.confirm(
+        `Submit "${activityName}" for ${participantDetails.data.participant.name}?\n\n` +
+          `This files ${scored} of ${total} competencies for this activity only. ` +
+          'You will not be able to edit it afterwards.' +
+          (remaining.length > 0
+            ? `\n\nStill to score, and NOT submitted by this: \n${remaining
+                .map(n => `  • ${n}`)
+                .join('\n')}`
+            : '\n\nThis is the last activity for this participant.')
+      );
+      if (!ok) return;
     }
 
     setIsSubmittingScore(true);
@@ -994,6 +1032,12 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
         // than only the rubric's stock text. Both used to be lost on close.
         reportDescriptors: buildReportDescriptorsForSave(),
         observations,
+        // Only the activity being submitted changes state; the server merges
+        // this into whatever was submitted before.
+        activityStatuses:
+          status === 'SUBMITTED' && submittingActivity
+            ? { [submittingActivity.activityId]: 'SUBMITTED' as const }
+            : undefined,
         activitySelectedScoreKeys: activitySelectedScoreKeys, // Include selected tick marks for activities
         assignmentSelectedScoreKeys: assignmentSelectedScoreKeys[assignmentId] || {}, // Include selected tick marks for assignment
         editReason: editMode ? editReason : undefined, // Include edit reason if in edit mode
@@ -1022,9 +1066,35 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
           Object.keys(aiSuggestions).map(activityId => recordAiOutcome(activityId))
         );
         setScoreStatus(prev => ({ ...prev, [assignmentId]: status }));
-        alert(`Scores ${status === 'DRAFT' ? 'saved as draft' : 'submitted'} successfully for ${assignment.assessmentCenter.displayName}!`);
-        // Redirect to /assessor/assess after submission
-        router.push('/assessor/assess');
+
+        if (status === 'DRAFT') {
+          alert(`Scores saved as draft for ${assignment.assessmentCenter.displayName}!`);
+          router.push('/assessor/assess');
+        } else if (submittingActivity) {
+          const submittedId = submittingActivity.activityId;
+          setActivityStatuses(prev => ({ ...prev, [submittedId]: 'SUBMITTED' }));
+
+          // Stay on the participant while they still have activities to score,
+          // and move to the next one — being bounced to the list after each
+          // activity is what made it tempting to submit everything at once.
+          const nextActivity = (assignment.activities || []).find(
+            a => a.activityId !== submittedId && activityStatuses[a.activityId] !== 'SUBMITTED'
+          );
+
+          if (nextActivity) {
+            const nextName = nextActivity.displayName || nextActivity.activityDetail.name;
+            alert(
+              `"${submittingActivity.displayName || submittingActivity.activityDetail.name}" submitted.\n\n` +
+                `Next: ${nextName}.`
+            );
+            setSelectedActivityId(nextActivity.activityId);
+          } else {
+            alert(
+              `All activities submitted for ${participantDetails.data.participant.name}.`
+            );
+            router.push('/assessor/assess');
+          }
+        }
       } else {
         throw new Error(result.message || 'Failed to submit scores');
       }
@@ -1311,6 +1381,7 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
                 ),
                 scored,
                 total,
+                submitted: activityStatuses[activity.activityId] === 'SUBMITTED',
               };
             });
 
@@ -1336,12 +1407,20 @@ const AssessmentDetail = ({ params }: ParticipantScoringProps) => {
             selectedActivity ? activitySelectedScoreKeys[selectedActivity.activityId] : undefined,
             selectedActivity ? activityCompetencyScores[selectedActivity.activityId] : undefined
           );
-          const lifecycleStatus = scoreStatus[selectedAssignmentId] ?? 'DRAFT';
+          // Status now belongs to the activity on screen, not the whole
+          // assignment: submitting one must not lock the others. FINALIZED is
+          // an admin action over the entire record, so it still locks everything.
+          const assignmentFinalized = scoreStatus[selectedAssignmentId] === 'FINALIZED';
+          const selectedActivitySubmitted =
+            !!selectedActivityId && activityStatuses[selectedActivityId] === 'SUBMITTED';
 
-          const isScoringDisabled =
-            (scoreStatus[selectedAssignmentId] === 'SUBMITTED' ||
-              scoreStatus[selectedAssignmentId] === 'FINALIZED') &&
-            !editMode;
+          const lifecycleStatus: ScoreLifecycleStatus = assignmentFinalized
+            ? 'FINALIZED'
+            : selectedActivitySubmitted
+              ? 'SUBMITTED'
+              : 'DRAFT';
+
+          const isScoringDisabled = (assignmentFinalized || selectedActivitySubmitted) && !editMode;
 
           // Next walks sub-competencies, then rolls into the next competency.
           const advanceSubCompetency = () => {

@@ -120,6 +120,10 @@ export interface AssessorScore {
   competencyAverages?: Record<string, number>;
   /** `activityId -> observations`, as saved with the score. */
   observations?: Record<string, unknown>;
+  /** `activityId -> 'SUBMITTED'`. Absent on records saved before per-activity submission. */
+  activityStatuses?: Record<string, string>;
+  /** `activityId -> competencyId -> subCompetency -> score`. */
+  activityCompetencyScores?: Record<string, Record<string, Record<string, number>>>;
   /**
    * activityId -> competencyId -> subCompetency -> selectedScoreKey
    * Stores which rubric level/tick mark was selected (e.g., "score1", "score2")

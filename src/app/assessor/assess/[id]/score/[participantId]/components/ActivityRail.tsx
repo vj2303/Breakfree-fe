@@ -10,18 +10,20 @@ export interface RailActivity {
   typeLabel: string;
   scored: number;
   total: number;
+  /** Filed and locked. Submitting is per activity, so this varies across the rail. */
+  submitted: boolean;
 }
 
 export interface ActivityRailProps {
   activities: RailActivity[];
   selectedActivityId: string | null;
   onSelectActivity: (activityId: string) => void;
-  /** Submission state for the whole assignment — one submit covers every activity. */
+  /** FINALIZED locks the whole record; otherwise each activity carries its own state. */
   lifecycleStatus: ScoreLifecycleStatus;
   participantName: string;
 }
 
-type RailState = 'submitted' | 'scored' | 'in_progress' | 'not_started';
+type RailState = 'submitted' | 'ready' | 'in_progress' | 'not_started';
 
 const STATE_STYLE: Record<RailState, { label: string; pill: string; icon: typeof Check }> = {
   submitted: {
@@ -29,8 +31,8 @@ const STATE_STYLE: Record<RailState, { label: string; pill: string; icon: typeof
     pill: 'border-green-200 bg-green-50 text-green-700',
     icon: Check,
   },
-  scored: {
-    label: 'Scored',
+  ready: {
+    label: 'Ready to submit',
     pill: 'border-violet-200 bg-violet-50 text-violet-700',
     icon: Check,
   },
@@ -47,18 +49,18 @@ const STATE_STYLE: Record<RailState, { label: string; pill: string; icon: typeof
 };
 
 function stateOf(activity: RailActivity, lifecycleStatus: ScoreLifecycleStatus): RailState {
-  if (lifecycleStatus === 'SUBMITTED' || lifecycleStatus === 'FINALIZED') return 'submitted';
-  if (activity.total > 0 && activity.scored >= activity.total) return 'scored';
+  if (activity.submitted || lifecycleStatus === 'FINALIZED') return 'submitted';
+  if (activity.total > 0 && activity.scored >= activity.total) return 'ready';
   return activity.scored > 0 ? 'in_progress' : 'not_started';
 }
 
 /**
- * Every activity assigned for this participant, with its own progress.
+ * Every activity assigned for this participant, each with its own progress and
+ * its own submitted state.
  *
  * The only way to discover a second activity used to be opening the header
  * dropdown, so an assessor could finish one, assume they were done and leave
- * the rest unscored. One submit covers the whole assignment, so an activity
- * missed here is filed empty.
+ * the rest unscored.
  */
 export default function ActivityRail({
   activities,
@@ -71,9 +73,9 @@ export default function ActivityRail({
   if (activities.length < 2) return null;
 
   const outstanding = activities.filter(
-    (activity) => stateOf(activity, lifecycleStatus) !== 'submitted' && activity.scored < activity.total
+    (activity) => stateOf(activity, lifecycleStatus) !== 'submitted'
   );
-  const awaitingSubmission = lifecycleStatus !== 'SUBMITTED' && lifecycleStatus !== 'FINALIZED';
+  const submittedCount = activities.length - outstanding.length;
 
   return (
     <div className="border-b border-gray-200 bg-white px-4 py-3">
@@ -82,7 +84,7 @@ export default function ActivityRail({
           Activities for {participantName}
         </span>
         <span className="text-[11px] text-gray-500">
-          {activities.length - outstanding.length} of {activities.length} scored
+          {submittedCount} of {activities.length} submitted
         </span>
       </div>
 
@@ -128,7 +130,7 @@ export default function ActivityRail({
                     className={`block h-full rounded-full ${
                       state === 'submitted'
                         ? 'bg-green-500'
-                        : state === 'scored'
+                        : state === 'ready'
                           ? 'bg-violet-500'
                           : 'bg-amber-400'
                     }`}
@@ -146,13 +148,13 @@ export default function ActivityRail({
         })}
       </div>
 
-      {awaitingSubmission && outstanding.length > 0 && (
+      {outstanding.length > 0 && (
         <p className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-amber-700">
           <AlertTriangle size={12} className="flex-shrink-0" />
-          {outstanding.length} more {outstanding.length === 1 ? 'activity' : 'activities'} to score
-          for {participantName}
-          {outstanding.length <= 2 && <> — {outstanding.map((a) => a.label).join(', ')}</>}. One
-          submit files every activity, so anything left unscored is filed empty.
+          {outstanding.length} more {outstanding.length === 1 ? 'activity' : 'activities'} to
+          submit for {participantName}
+          {outstanding.length <= 2 && <> — {outstanding.map((a) => a.label).join(', ')}</>}. Submit
+          files only the activity on screen, so the rest stay as drafts.
         </p>
       )}
     </div>
