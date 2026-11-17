@@ -11,8 +11,13 @@ export const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
 export const MAX_UPLOAD_LABEL = '500 MB';
 
 /** `accept` values and the human list shown under each dropzone. */
-export const MEDIA_ACCEPT = 'video/*,audio/*,.mov,.m4a,.webm';
-export const MEDIA_TYPES_LABEL = 'MP4, MOV, WebM, M4A or MP3';
+export const MEDIA_ACCEPT = 'video/*,audio/*,.mov,.m4a,.webm,.mkv,.avi,.wmv,.m4v,.3gp,.flac,.ogg,.opus,.aac,.amr';
+/**
+ * The server converts whatever it is given before transcribing, so a
+ * participant is never asked to convert a recording themselves — which
+ * mattered most for .mov, the default on every iPhone and Mac.
+ */
+export const MEDIA_TYPES_LABEL = 'Any common video or audio format — MP4, MOV, M4A, WebM, MP3 and others';
 
 export const DOCUMENT_ACCEPT = '.pdf,.doc,.docx,.ppt,.pptx,.txt';
 export const DOCUMENT_TYPES_LABEL = 'PDF, Word, PowerPoint or text';
