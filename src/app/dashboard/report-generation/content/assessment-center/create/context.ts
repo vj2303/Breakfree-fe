@@ -47,11 +47,16 @@ export interface Descriptors {
   };
 }
 
+export type AssessmentStage = 'PRE' | 'POST' | 'STANDALONE';
+
 export interface FormData {
   name: string;
   description: string;
   displayName: string;
   displayInstructions: string;
+  // Pre/Post tagging (BREAK-9). A POST centre links to its PRE centre.
+  stage?: AssessmentStage;
+  comparesToAssessmentCenterId?: string | null;
   competencyIds: string[];
   selectedCompetenciesData: CompetencyData[];
   reportTemplateName: string;

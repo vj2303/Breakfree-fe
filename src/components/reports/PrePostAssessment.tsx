@@ -22,18 +22,24 @@ interface PrePostAssessmentProps {
 interface CompetencyData {
   competencyId: string;
   competencyName: string;
-  // null where that source recorded nothing for this competency.
-  preAssessmentApp: number | null;
-  preAssessmentApp2: number | null;
-  improvement: number | null;
-  postAssessmentReadiness: number | null;
+  // Application = assessor (BARS) measured scores. null where not measured.
+  preApplication: number | null;
+  postApplication: number | null;
+  applicationDelta: number | null;
 }
 
-/** An unmeasured score is shown as such, never as a blank cell or a 0. */
-const NoData = () => <span className="text-gray-400">No data</span>;
+/** A score that was never measured is shown as such, never as a blank cell or a 0. */
+const NotAssessed = () => <span className="text-gray-400">Not yet assessed</span>;
 
 const cell = (value: number | null) =>
-  typeof value === 'number' && Number.isFinite(value) ? value.toFixed(1) : <NoData />;
+  typeof value === 'number' && Number.isFinite(value) ? value.toFixed(1) : <NotAssessed />;
+
+/** Difference cell: only shown when both sides were measured; never "+0.0" filler. */
+const deltaCell = (value: number | null) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return <NotAssessed />;
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${value.toFixed(1)}`;
+};
 
 const PrePostAssessment: React.FC<PrePostAssessmentProps> = ({
   participantId,
@@ -42,7 +48,9 @@ const PrePostAssessment: React.FC<PrePostAssessmentProps> = ({
   assessmentCenterId,
 }) => {
   const [data, setData] = useState<CompetencyData[]>([]);
-  const [dataSource, setDataSource] = useState<'uploaded' | 'inferred' | null>(null);
+  const [comparison, setComparison] = useState(false);
+  const [preName, setPreName] = useState<string | null>(null);
+  const [postName, setPostName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,7 +66,7 @@ const PrePostAssessment: React.FC<PrePostAssessmentProps> = ({
         queryParams.append('assessmentCenterId', assessmentCenterId);
       }
       const url = `/api/management-reports/participant/${participantId}/pre-post-assessment${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-      
+
       const res = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -68,7 +76,9 @@ const PrePostAssessment: React.FC<PrePostAssessmentProps> = ({
       if (res.ok) {
         const result = await res.json();
         setData(result.data?.competencies || []);
-        setDataSource(result.data?.dataSource ?? null);
+        setComparison(Boolean(result.data?.comparison));
+        setPreName(result.data?.preAssessmentName ?? null);
+        setPostName(result.data?.postAssessmentName ?? null);
       } else {
         setError('Failed to load data');
       }
@@ -86,21 +96,12 @@ const PrePostAssessment: React.FC<PrePostAssessmentProps> = ({
     }
   }, [token, participantId, fetchData]);
 
-  // Prepare data for table
-  const tableData = data.map((comp) => ({
-    competency: comp.competencyName,
-    preAssessmentApp: comp.preAssessmentApp,
-    preAssessmentApp2: comp.preAssessmentApp2,
-    improvement: comp.improvement,
-    postAssessmentReadiness: comp.postAssessmentReadiness,
-  }));
-
-  // Prepare data for graph
+  // In single-event mode the "current" score is the post/current application score.
   const graphData = data.map((comp) => ({
     name: comp.competencyName,
-    preAssessment: comp.preAssessmentApp,
-    preAssessment2: comp.preAssessmentApp2,
-    postAssessment: comp.postAssessmentReadiness,
+    pre: comp.preApplication,
+    post: comp.postApplication,
+    score: comp.postApplication,
   }));
 
   if (loading) {
@@ -125,49 +126,45 @@ const PrePostAssessment: React.FC<PrePostAssessmentProps> = ({
       <div className="bg-white border-b border-gray-200">
         <div className="px-4 py-3 border-b border-gray-200">
           <h3 className="text-sm font-semibold text-black">
-            Pre vs Post Assessment ({participantName})
+            {comparison ? 'Pre vs Post Assessment' : 'Assessment Scores'} ({participantName})
           </h3>
-          {dataSource && (
-            <p className="mt-1 text-xs text-gray-500">
-              {dataSource === 'uploaded'
-                ? 'Based on uploaded pre/post assessment scores.'
-                : 'Inferred from earliest vs latest assessor submission. Upload pre/post scores for a true comparison.'}
-            </p>
-          )}
+          <p className="mt-1 text-xs text-gray-500">
+            {comparison
+              ? `Comparing "${preName ?? 'Pre'}" (Pre) against "${postName ?? 'Post'}" (Post). Difference is shown only where both were assessed.`
+              : 'Single-event assessment. Tag a Pre and a Post assessment to see a comparison.'}
+          </p>
         </div>
         <div className="px-4 py-3 overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 text-sm font-semibold text-black">
-                  Competencies
-                </th>
-                <th className="text-left py-3 px-4 text-sm font-semibold text-black">
-                  Pre- Assessment App
-                </th>
-                <th className="text-left py-3 px-4 text-sm font-semibold text-black">
-                  Pre- Assessment App
-                </th>
-                <th className="text-left py-3 px-4 text-sm font-semibold text-black">
-                  Improvement
-                </th>
-                <th className="text-left py-3 px-4 text-sm font-semibold text-black">
-                  Post Assessment readiness
-                </th>
+                <th className="text-left py-3 px-4 text-sm font-semibold text-black">Competencies</th>
+                {comparison ? (
+                  <>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-black">Pre</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-black">Post</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-black">Difference</th>
+                  </>
+                ) : (
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-black">Score</th>
+                )}
               </tr>
             </thead>
             <tbody>
-              {tableData.map((row, index) => (
-                <tr key={index} className="border-b border-gray-200">
-                  <td className="py-3 px-4 text-sm text-black">{row.competency}</td>
-                  <td className="py-3 px-4 text-sm text-black">{cell(row.preAssessmentApp)}</td>
-                  <td className="py-3 px-4 text-sm text-black">{cell(row.preAssessmentApp2)}</td>
-                  <td className="py-3 px-4 text-sm text-black font-medium bg-gray-100">
-                    {cell(row.improvement)}
-                  </td>
-                  <td className="py-3 px-4 text-sm text-black">
-                    {cell(row.postAssessmentReadiness)}
-                  </td>
+              {data.map((row) => (
+                <tr key={row.competencyId} className="border-b border-gray-200">
+                  <td className="py-3 px-4 text-sm text-black">{row.competencyName}</td>
+                  {comparison ? (
+                    <>
+                      <td className="py-3 px-4 text-sm text-black">{cell(row.preApplication)}</td>
+                      <td className="py-3 px-4 text-sm text-black">{cell(row.postApplication)}</td>
+                      <td className="py-3 px-4 text-sm text-black font-medium bg-gray-100">
+                        {deltaCell(row.applicationDelta)}
+                      </td>
+                    </>
+                  ) : (
+                    <td className="py-3 px-4 text-sm text-black">{cell(row.postApplication)}</td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -179,7 +176,7 @@ const PrePostAssessment: React.FC<PrePostAssessmentProps> = ({
       <div className="bg-white border-t border-gray-200">
         <div className="px-4 py-3 border-b border-gray-200">
           <h3 className="text-sm font-semibold text-black">
-            Pre vs Post Assessment Graph ({participantName})
+            {comparison ? 'Pre vs Post Assessment Graph' : 'Assessment Scores Graph'} ({participantName})
           </h3>
         </div>
         <div className="px-4 py-3">
@@ -209,38 +206,41 @@ const PrePostAssessment: React.FC<PrePostAssessmentProps> = ({
                   }}
                 />
                 <Legend wrapperStyle={{ fontSize: '11px' }} />
-                <Line
-                  type="monotone"
-                  dataKey="preAssessment"
-                  stroke="#000000"
-                  strokeWidth={2}
-                  dot={{ fill: '#000000', r: 3 }}
-                  name="Pre Assessment App"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="preAssessment2"
-                  stroke="#808080"
-                  strokeWidth={2}
-                  dot={{ fill: '#808080', r: 3 }}
-                  name="Pre Assessment App 2"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="postAssessment"
-                  stroke="#404040"
-                  strokeWidth={2}
-                  dot={{ fill: '#404040', r: 3 }}
-                  name="Post Assessment Readiness"
-                />
+                {comparison ? (
+                  <>
+                    <Line
+                      type="monotone"
+                      dataKey="pre"
+                      stroke="#808080"
+                      strokeWidth={2}
+                      dot={{ fill: '#808080', r: 3 }}
+                      name={preName ? `${preName} (Pre)` : 'Pre'}
+                      connectNulls={false}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="post"
+                      stroke="#000000"
+                      strokeWidth={2}
+                      dot={{ fill: '#000000', r: 3 }}
+                      name={postName ? `${postName} (Post)` : 'Post'}
+                      connectNulls={false}
+                    />
+                  </>
+                ) : (
+                  <Line
+                    type="monotone"
+                    dataKey="score"
+                    stroke="#000000"
+                    strokeWidth={2}
+                    dot={{ fill: '#000000', r: 3 }}
+                    name="Score"
+                    connectNulls={false}
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
           </div>
-        </div>
-        <div className="px-4 py-3 border-t border-gray-200 flex justify-end">
-          <button className="px-4 py-2 text-sm font-medium text-black border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-            View Report
-          </button>
         </div>
       </div>
     </div>
@@ -248,4 +248,3 @@ const PrePostAssessment: React.FC<PrePostAssessmentProps> = ({
 };
 
 export default PrePostAssessment;
-

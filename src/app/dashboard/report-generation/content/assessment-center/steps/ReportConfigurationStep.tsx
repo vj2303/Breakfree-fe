@@ -1,7 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { useAssessmentForm } from '../create/context';
+import type { AssessmentStage } from '../create/context';
 import { useAuth } from '@/context/AuthContext';
 import { ReportStructureApi } from '@/lib/reportStructureApi';
+import { API_BASE_URL_WITH_API } from '@/lib/apiConfig';
+
+const STAGE_OPTIONS: { value: AssessmentStage; label: string; hint: string }[] = [
+  { value: 'STANDALONE', label: 'Standalone', hint: 'A one-off assessment (default).' },
+  { value: 'PRE', label: 'Pre-assessment', hint: 'A baseline that a later Post-assessment is compared against.' },
+  { value: 'POST', label: 'Post-assessment', hint: 'A follow-up that measures progress against a Pre-assessment.' },
+];
+
+interface PreCentreOption { id: string; name: string }
 
 interface ReportTemplate {
   id: string;
@@ -27,6 +37,43 @@ const ReportConfigurationStep = () => {
     throw new Error('ReportConfigurationStep must be used within AssessmentFormContext');
   }
   const { formData, updateFormData } = context;
+
+  // ── Pre/Post stage (BREAK-9) ──────────────────────────────────────────
+  const stage: AssessmentStage = (formData.stage as AssessmentStage) || 'STANDALONE';
+  const [preCentres, setPreCentres] = useState<PreCentreOption[]>([]);
+
+  // Load existing Pre-assessment centres to link a Post against.
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL_WITH_API}/assessment-centers?limit=200`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json();
+        const list = json?.data?.assessmentCenters || json?.assessmentCenters || [];
+        if (cancelled) return;
+        setPreCentres(
+          list
+            .filter((c: { stage?: string }) => c.stage === 'PRE')
+            .map((c: { id: string; displayName?: string; name?: string }) => ({
+              id: c.id,
+              name: c.displayName || c.name || 'Untitled',
+            }))
+        );
+      } catch (err) {
+        console.error('Error loading pre-assessment centres:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [token]);
+
+  const setStage = (next: AssessmentStage) => {
+    updateFormData('stage', next);
+    // A link only makes sense for a Post centre; clear it otherwise.
+    if (next !== 'POST') updateFormData('comparesToAssessmentCenterId', null);
+  };
 
   // Fetch report structures from API
   useEffect(() => {
@@ -212,6 +259,60 @@ const ReportConfigurationStep = () => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Assessment stage (Pre / Post / Standalone) — BREAK-9 */}
+      <div className="bg-white rounded-2xl p-8 max-w-xl mt-6">
+        <div className="font-bold text-lg text-black mb-1">Assessment stage</div>
+        <p className="text-sm text-gray-500 mb-4">
+          Tag this as a Pre or Post assessment so the report can compare them.
+          A Post-assessment links to the Pre it measures progress against.
+        </p>
+        <div className="flex flex-col gap-2">
+          {STAGE_OPTIONS.map(opt => (
+            <label
+              key={opt.value}
+              className={`flex items-start gap-3 px-4 py-3 border rounded-lg cursor-pointer transition-colors ${
+                stage === opt.value ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400'
+              }`}
+            >
+              <input
+                type="radio"
+                name="assessment-stage"
+                className="mt-1"
+                checked={stage === opt.value}
+                onChange={() => setStage(opt.value)}
+              />
+              <span>
+                <span className="block text-black font-medium">{opt.label}</span>
+                <span className="block text-xs text-gray-500">{opt.hint}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+
+        {stage === 'POST' && (
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-black mb-1">
+              Measures progress against
+            </label>
+            <select
+              value={formData.comparesToAssessmentCenterId || ''}
+              onChange={e => updateFormData('comparesToAssessmentCenterId', e.target.value || null)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Select a Pre-assessment…</option>
+              {preCentres.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            {preCentres.length === 0 && (
+              <p className="mt-1 text-xs text-amber-600">
+                No Pre-assessment centres found. Create one tagged “Pre-assessment” first.
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

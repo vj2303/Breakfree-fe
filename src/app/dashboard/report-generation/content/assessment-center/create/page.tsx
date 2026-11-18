@@ -53,6 +53,8 @@ const createEmptyFormData = (): FormData => ({
   selectedCompetenciesData: [],
   reportTemplateName: '',
   reportTemplateType: '',
+  stage: 'STANDALONE',
+  comparesToAssessmentCenterId: null,
   activities: [],
   assignments: [],
   document: null,
@@ -350,6 +352,8 @@ const AssessmentFormProvider: React.FC<{ children: React.ReactNode; editId?: str
                 selectedCompetenciesData: data.competencies || [],
                 reportTemplateName: data.reportTemplateName || '',
                 reportTemplateType: data.reportTemplateType || '',
+                stage: data.stage || 'STANDALONE',
+                comparesToAssessmentCenterId: data.comparesToAssessmentCenterId || null,
                 activities: mappedActivities,
                 assignments: mappedAssignments,
                 document: null,
@@ -682,6 +686,9 @@ const CreateAssessmentCenterContent = ({ editId }: { editId?: string }) => {
         competencyIds: formData.competencyIds || [],
         reportTemplateName: formData.reportTemplateName || 'Default Report',
         reportTemplateType: formData.reportTemplateType || '', // Template ID (string) - required field
+        stage: formData.stage || 'STANDALONE',
+        comparesToAssessmentCenterId:
+          formData.stage === 'POST' ? (formData.comparesToAssessmentCenterId || '') : '',
         activities: transformedActivities,
         assignments: formData.assignments || [],
         // Resolve any `activity-<index>` placeholders to real activity ids first,
@@ -705,6 +712,8 @@ const CreateAssessmentCenterContent = ({ editId }: { editId?: string }) => {
       form.append('competencyIds', JSON.stringify(payload.competencyIds));
       form.append('reportTemplateName', payload.reportTemplateName);
       form.append('reportTemplateType', payload.reportTemplateType);
+      form.append('stage', payload.stage);
+      form.append('comparesToAssessmentCenterId', payload.comparesToAssessmentCenterId);
       form.append('activities', JSON.stringify(payload.activities));
       form.append('assignments', JSON.stringify(payload.assignments));
       form.append('descriptors', JSON.stringify(payload.descriptors)); // Include descriptors
