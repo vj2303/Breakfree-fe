@@ -17,7 +17,11 @@ import {
   assessorCompetencyAverage,
   assessorCompetencyComments,
   competencyMax,
+  getScoreDescriptions,
+  parseScoreKeyLevel,
   roundToDisplay,
+  shortSubCompetency,
+  sortedScoreKeys,
 } from './scoring';
 import type {
   AssessorRecord,
@@ -215,37 +219,74 @@ export async function exportParticipantWorkbook(input: ParticipantExportInput): 
     if (completedAt) row.getCell('completedAt').numFmt = 'dd mmm yyyy hh:mm';
   });
 
-  // ── 4. Assessor comments ─────────────────────────────────────────
-  // The evidence behind the scores, which is the part a reader most often
-  // wants alongside the numbers and cannot get out of a chart.
-  const commentSheet = addSheet('Assessor comments', [
-    { header: 'Activity', key: 'activity', width: 34 },
+  // ── 4. Assessor evidence ─────────────────────────────────────────
+  // How each score was reached: the level the assessor picked, the
+  // behavioural descriptor for that level, and any comment. A score without
+  // its descriptor gives a reader no reference for the number.
+  const evidenceSheet = addSheet('Assessor evidence', [
+    { header: 'Activity', key: 'activity', width: 32 },
     { header: 'Code', key: 'code', width: 8 },
-    { header: 'Competency', key: 'competency', width: 30 },
-    { header: 'Sub-competency', key: 'subCompetency', width: 34 },
-    { header: 'Assessor', key: 'assessor', width: 20 },
-    { header: 'Comment', key: 'comment', width: 80 },
+    { header: 'Competency', key: 'competency', width: 28 },
+    { header: 'Sub-competency', key: 'subCompetency', width: 32 },
+    { header: 'Assessor', key: 'assessor', width: 18 },
+    { header: 'Level', key: 'level', width: 8 },
+    { header: 'Levels available', key: 'levelsAvailable', width: 16 },
+    { header: 'Behavioural descriptor', key: 'descriptor', width: 70 },
+    { header: 'Comment', key: 'comment', width: 60 },
   ]);
 
   activities.forEach((activity) => {
     competencies.forEach((competency) => {
       assessors.forEach((assessor) => {
-        assessorCompetencyComments(assessor, activity.activityId, competency).forEach((entry) => {
-          commentSheet.addRow({
+        const commentBySub = new Map(
+          assessorCompetencyComments(assessor, activity.activityId, competency).map((entry) => [
+            entry.subCompetency,
+            entry.comment,
+          ])
+        );
+
+        competency.subCompetencyNames.forEach((subComp) => {
+          const selectedKey =
+            assessor.activitySelectedScoreKeys?.[activity.activityId]?.[competency.id]?.[subComp];
+          const rawScore =
+            assessor.activityCompetencyScores?.[activity.activityId]?.[competency.id]?.[subComp];
+          const short = shortSubCompetency(subComp);
+          const comment = commentBySub.get(short) || '';
+
+          // Untouched by this assessor — not a zero, so it is left out.
+          const hasScore = Boolean(selectedKey) || (typeof rawScore === 'number' && rawScore > 0);
+          if (!hasScore && !comment) return;
+
+          const descriptions = getScoreDescriptions(
+            descriptors,
+            activity.activityId,
+            competency.id,
+            subComp
+          );
+          const levels = sortedScoreKeys(descriptions).length;
+
+          evidenceSheet.addRow({
             activity: activity.name,
             code: competency.code,
             competency: competency.label,
-            subCompetency: entry.subCompetency,
+            subCompetency: short,
             assessor: assessor.name,
-            comment: entry.comment,
+            level: selectedKey
+              ? parseScoreKeyLevel(selectedKey)
+              : typeof rawScore === 'number' && rawScore > 0
+                ? rawScore
+                : null,
+            levelsAvailable: levels > 0 ? levels : null,
+            descriptor: selectedKey ? (descriptions[selectedKey] || '').trim() : '',
+            comment,
           });
         });
       });
     });
   });
 
-  if (commentSheet.rowCount === 1) {
-    commentSheet.addRow({ activity: 'No comments recorded.' });
+  if (evidenceSheet.rowCount === 1) {
+    evidenceSheet.addRow({ activity: 'Nothing scored yet.' });
   }
 
   // ── Download ─────────────────────────────────────────────────────

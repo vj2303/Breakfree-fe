@@ -10,8 +10,12 @@ import {
   badgeStyle,
   competencyMax,
   formatScore,
+  getScoreDescriptions,
   mean,
+  parseScoreKeyLevel,
   roundToDisplay,
+  shortSubCompetency,
+  sortedScoreKeys,
 } from './scoring';
 import type { AssessorRecord, OverviewActivity, OverviewCompetency } from './types';
 
@@ -131,48 +135,92 @@ export default function ScoringDetailsPanel({
   }, [rows, assessors, moderatorScores, activeTab]);
 
   /**
-   * Every assessor comment in scope, grouped by competency, so an admin can
-   * read the whole picture for a tab without opening each row's icon. The
-   * per-row icon stays for reading one competency in place.
+   * What each assessor actually selected, grouped by competency.
    *
-   * On an activity tab the activity is implied, so it is left off each entry;
-   * on the overall tab the same competency carries comments from several
-   * activities, so each one is labelled.
+   * A score on its own gives an admin no reference for how it was arrived at,
+   * so each entry carries the level the assessor picked, the behavioural
+   * descriptor for that level, and any comment they left against it. Comments
+   * alone were not enough: most sub-competencies are scored without one, and
+   * those rows used to vanish entirely.
+   *
+   * On an activity tab the activity is implied and left off; on the overall
+   * tab the same competency is scored in several activities, so each is named.
    */
-  const commentGroups = useMemo(() => {
+  const evidenceGroups = useMemo(() => {
     return rows
       .map((row) => {
         const entries: Array<{
           assessorName: string;
           activityName: string | null;
           subCompetency: string;
+          level: number | null;
+          levelsAvailable: number;
+          descriptor: string;
           comment: string;
         }> = [];
 
         // Deliberately not filtered by the activity's configured competencies:
-        // a comment that exists is evidence an assessor recorded, and skipping
-        // it because the centre's configuration does not list that pairing
-        // would silently hide real feedback. Groups that end up empty are
-        // dropped below, so nothing shows a heading with no content.
+        // a mark that exists is evidence an assessor recorded, and skipping it
+        // because the centre's configuration does not list that pairing would
+        // hide real work. Groups that end up empty are dropped below.
         activitiesInScope.forEach((activity) => {
           assessors.forEach((assessor) => {
-            assessorCompetencyComments(assessor, activity.activityId, row.competency).forEach(
-              ({ subCompetency, comment }) => {
-                entries.push({
-                  assessorName: assessor.name,
-                  activityName: isOverall ? activity.name : null,
-                  subCompetency,
-                  comment,
-                });
-              }
+            const comments = assessorCompetencyComments(
+              assessor,
+              activity.activityId,
+              row.competency
             );
+            const commentBySub = new Map(
+              comments.map((entry) => [entry.subCompetency, entry.comment])
+            );
+
+            row.competency.subCompetencyNames.forEach((subComp) => {
+              const selectedKey =
+                assessor.activitySelectedScoreKeys?.[activity.activityId]?.[row.competency.id]?.[
+                  subComp
+                ];
+              const rawScore =
+                assessor.activityCompetencyScores?.[activity.activityId]?.[row.competency.id]?.[
+                  subComp
+                ];
+
+              const short = shortSubCompetency(subComp);
+              const comment = commentBySub.get(short) || '';
+
+              // Nothing scored and nothing written means this assessor did not
+              // touch this sub-competency — not a zero, so it is left out.
+              const hasScore =
+                Boolean(selectedKey) || (typeof rawScore === 'number' && rawScore > 0);
+              if (!hasScore && !comment) return;
+
+              const descriptions = getScoreDescriptions(
+                descriptors,
+                activity.activityId,
+                row.competency.id,
+                subComp
+              );
+
+              entries.push({
+                assessorName: assessor.name,
+                activityName: isOverall ? activity.name : null,
+                subCompetency: short,
+                level: selectedKey
+                  ? parseScoreKeyLevel(selectedKey)
+                  : typeof rawScore === 'number' && rawScore > 0
+                    ? rawScore
+                    : null,
+                levelsAvailable: sortedScoreKeys(descriptions).length,
+                descriptor: selectedKey ? (descriptions[selectedKey] || '').trim() : '',
+                comment,
+              });
+            });
           });
         });
 
         return { competency: row.competency, competencyIndex: row.competencyIndex, entries };
       })
       .filter((group) => group.entries.length > 0);
-  }, [rows, activitiesInScope, assessors, isOverall]);
+  }, [rows, activitiesInScope, assessors, isOverall, descriptors]);
 
   /**
    * Comments an assessor left on the activity as a whole, or on the submission
@@ -429,20 +477,20 @@ export default function ScoringDetailsPanel({
 
       {assessors.length > 0 && (
         <section className="mt-8 border-t border-gray-200 pt-6">
-          <h4 className="text-sm font-bold text-black">Assessor Comments</h4>
+          <h4 className="text-sm font-bold text-black">Assessor Evidence</h4>
           <p className="mt-0.5 text-xs text-gray-500">
             {isOverall
-              ? 'Every comment recorded across all activities, grouped by competency.'
-              : `Comments recorded for ${activeActivity?.name ?? 'this activity'}, grouped by competency.`}
+              ? 'The level each assessor selected across all activities, with its descriptor and any comment.'
+              : `What each assessor selected for ${activeActivity?.name ?? 'this activity'}, with its descriptor and any comment.`}
           </p>
 
-          {commentGroups.length === 0 && generalComments.length === 0 ? (
+          {evidenceGroups.length === 0 && generalComments.length === 0 ? (
             <p className="mt-4 rounded-xl border border-dashed border-gray-200 py-8 text-center text-sm text-gray-400">
               No comments recorded.
             </p>
           ) : (
             <div className="mt-4 space-y-5">
-              {commentGroups.map((group) => (
+              {evidenceGroups.map((group) => (
                 <div key={group.competency.id}>
                   <div className="flex items-center gap-2">
                     <span
@@ -461,12 +509,34 @@ export default function ScoringDetailsPanel({
                     {group.entries.map((entry, index) => (
                       <li key={`${group.competency.id}-${index}`}>
                         <p className="text-[11px] text-gray-500">
+                          <span className="font-medium text-gray-800">{entry.subCompetency}</span>
+                          {' · '}
                           <span className="font-semibold text-gray-700">{entry.assessorName}</span>
                           {entry.activityName && <> · {entry.activityName}</>}
-                          {' · '}
-                          {entry.subCompetency}
+                          {entry.level !== null && (
+                            <>
+                              {' · '}
+                              <span className="font-semibold text-violet-700">
+                                Level {entry.level}
+                                {entry.levelsAvailable > 0 && ` of ${entry.levelsAvailable}`}
+                              </span>
+                            </>
+                          )}
                         </p>
-                        <p className="text-sm leading-snug text-gray-800">{entry.comment}</p>
+
+                        {/* The descriptor is the reference for how the score
+                            was reached; without it a level is just a number. */}
+                        {entry.descriptor && (
+                          <p className="mt-0.5 text-sm leading-snug text-gray-800">
+                            {entry.descriptor}
+                          </p>
+                        )}
+
+                        {entry.comment && (
+                          <p className="mt-0.5 border-l-2 border-violet-200 pl-2 text-sm italic leading-snug text-gray-600">
+                            {entry.comment}
+                          </p>
+                        )}
                       </li>
                     ))}
                   </ul>
