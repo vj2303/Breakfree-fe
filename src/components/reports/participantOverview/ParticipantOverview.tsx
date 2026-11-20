@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Download, Loader2, Sparkles } from 'lucide-react';
+import { ChevronRight, Download, FileSpreadsheet, Loader2, Sparkles } from 'lucide-react';
 
 import { API_BASE_URL_WITH_API } from '@/lib/apiConfig';
 
@@ -74,6 +74,33 @@ export default function ParticipantOverview({
   const [assessors, setAssessors] = useState<AssessorRecord[]>([]);
   const [descriptors, setDescriptors] = useState<Record<string, unknown> | null>(null);
   const [progressPoints, setProgressPoints] = useState<ProgressPoint[]>([]);
+  const [exportingExcel, setExportingExcel] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  /** Downloads the figures on this screen as a workbook. */
+  const handleExportExcel = async () => {
+    setExportingExcel(true);
+    setExportError(null);
+    try {
+      const { exportParticipantWorkbook } = await import('./exportWorkbook');
+      await exportParticipantWorkbook({
+        participant,
+        assessmentCenter,
+        cohortName,
+        competencies,
+        activities,
+        completionRows,
+        assessors,
+        descriptors,
+        progressPoints,
+      });
+    } catch (err) {
+      console.error('Error exporting participant overview:', err);
+      setExportError('Could not build the Excel file. Please try again.');
+    } finally {
+      setExportingExcel(false);
+    }
+  };
 
   const authHeaders = useMemo(
     () => ({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
@@ -290,11 +317,29 @@ export default function ParticipantOverview({
           <span className="font-semibold text-black">Participant Overview</span>
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Two named actions rather than one "Export": the workbook is for
+              analysis, the PDF is the formatted participant report, and the
+              unlabelled button gave no way to tell which you would get. */}
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            disabled={exportingExcel || loading}
+            title="Download these figures as an Excel workbook"
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-black transition-colors hover:bg-gray-50 disabled:opacity-50"
+          >
+            {exportingExcel ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="h-4 w-4" />
+            )}
+            {exportingExcel ? 'Preparing…' : 'Export to Excel'}
+          </button>
           <button
             type="button"
             onClick={onExport}
             disabled={isExporting}
+            title="Download the formatted participant report"
             className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-black transition-colors hover:bg-gray-50 disabled:opacity-50"
           >
             {isExporting ? (
@@ -302,7 +347,7 @@ export default function ParticipantOverview({
             ) : (
               <Download className="h-4 w-4" />
             )}
-            Export
+            Export PDF
           </button>
           <button
             type="button"
@@ -312,6 +357,9 @@ export default function ParticipantOverview({
             <Sparkles className="h-4 w-4" />
             Generate AI Report
           </button>
+          {exportError && (
+            <span className="w-full text-right text-xs text-red-600">{exportError}</span>
+          )}
         </div>
       </div>
 
