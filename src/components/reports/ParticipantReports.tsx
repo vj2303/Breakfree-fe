@@ -98,7 +98,14 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
   const readinessFileRef = React.useRef<HTMLInputElement>(null);
   const [pendingUploadACId, setPendingUploadACId] = useState<string | null>(null);
   const [uploadingPrePost, setUploadingPrePost] = useState<string | null>(null); // AC id being uploaded
-  const [prePostUploadStatus, setPrePostUploadStatus] = useState<{ acId: string; message: string; type: 'success' | 'error' } | null>(null);
+  const [prePostUploadStatus, setPrePostUploadStatus] = useState<{
+    acId: string;
+    message: string;
+    type: 'success' | 'error';
+    /** Rows the file carried that could not be used, newest upload only. */
+    rowErrors?: Array<{ row: number; participant: string; competency: string; error: string }>;
+  } | null>(null);
+  const [downloadingTemplate, setDownloadingTemplate] = useState<string | null>(null);
   const prePostFileRef = React.useRef<HTMLInputElement>(null);
   const [pendingPrePostACId, setPendingPrePostACId] = useState<string | null>(null);
   /** Hides assessment centers nobody has scored yet, so the list reads like a live cohort. */
@@ -434,10 +441,20 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
         throw new Error(data.message || 'Upload failed');
       }
 
+      const { savedCount = 0, valuesRead = 0, measuresUploaded = [], rowErrors = [] } = data.data || {};
+      const columns = measuresUploaded.length > 0 ? ` (${measuresUploaded.join(', ')})` : '';
       setPrePostUploadStatus({
         acId: assessmentCenterId,
-        message: `Uploaded: ${data.data.savedCount} saved, ${data.data.skippedCount} skipped`,
-        type: 'success',
+        message:
+          valuesRead > 0
+            ? `Saved ${valuesRead} score${valuesRead === 1 ? '' : 's'} for ${savedCount} participant${
+                savedCount === 1 ? '' : 's'
+              }${columns}.${rowErrors.length > 0 ? ` ${rowErrors.length} row${rowErrors.length === 1 ? '' : 's'} could not be used:` : ''}`
+            : 'No scores were read from that file.',
+        // Rows that failed are the point of the message, so a file that saved
+        // nothing reads as a problem rather than a success.
+        type: valuesRead > 0 ? 'success' : 'error',
+        rowErrors,
       });
     } catch (err) {
       setPrePostUploadStatus({
@@ -447,6 +464,38 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
       });
     } finally {
       setUploadingPrePost(null);
+    }
+  };
+
+  /** The upload format as a filled-in workbook, so nobody has to guess it. */
+  const handleDownloadPrePostTemplate = async (assessmentCenterId: string) => {
+    if (!token) return;
+    setDownloadingTemplate(assessmentCenterId);
+    setPrePostUploadStatus(null);
+    try {
+      const response = await fetch(
+        `${API_V1_BASE_URL}/pre-post-scores/template?assessmentCenterId=${assessmentCenterId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.message || 'Could not build the template');
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'pre-post-scores-template.xlsx';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setPrePostUploadStatus({
+        acId: assessmentCenterId,
+        message: err instanceof Error ? err.message : 'Could not build the template',
+        type: 'error',
+      });
+    } finally {
+      setDownloadingTemplate(null);
     }
   };
 
@@ -874,12 +923,23 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
                               },
                               {
                                 label:
+                                  downloadingTemplate === ac.id
+                                    ? 'Preparing…'
+                                    : 'Download pre/post template',
+                                icon: Download,
+                                loading: downloadingTemplate === ac.id,
+                                description: 'Excel with the right headings and every participant',
+                                onSelect: () => handleDownloadPrePostTemplate(ac.id),
+                              },
+                              {
+                                label:
                                   uploadingPrePost === ac.id
                                     ? 'Uploading…'
                                     : 'Upload pre/post scores',
                                 icon: Upload,
                                 loading: uploadingPrePost === ac.id,
-                                description: 'Excel (.xlsx): Email | Competency | Pre | Post',
+                                description:
+                                  'Pre / Post × Readiness / Application — upload any of the four',
                                 onSelect: () => triggerPrePostUpload(ac.id),
                               },
                             ]}
@@ -901,6 +961,24 @@ const ParticipantReports: React.FC<ParticipantReportsProps> = ({ token }) => {
                               : 'bg-red-50 text-red-700 border border-red-200'
                           }`}>
                             {prePostUploadStatus.message}
+                            {prePostUploadStatus.rowErrors && prePostUploadStatus.rowErrors.length > 0 && (
+                              <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                                {/* Enough to fix the file without burying the page. */}
+                                {prePostUploadStatus.rowErrors.slice(0, 8).map((rowError, index) => (
+                                  <li key={`${rowError.row}-${index}`}>
+                                    Row {rowError.row}
+                                    {rowError.participant ? ` (${rowError.participant}` : ''}
+                                    {rowError.participant && rowError.competency
+                                      ? `, ${rowError.competency}`
+                                      : ''}
+                                    {rowError.participant ? ')' : ''} — {rowError.error}
+                                  </li>
+                                ))}
+                                {prePostUploadStatus.rowErrors.length > 8 && (
+                                  <li>…and {prePostUploadStatus.rowErrors.length - 8} more</li>
+                                )}
+                              </ul>
+                            )}
                           </div>
                         )}
                               </div>
