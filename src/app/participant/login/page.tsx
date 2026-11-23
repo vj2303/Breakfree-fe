@@ -92,6 +92,15 @@ export default function ParticipantLogin() {
               Login to access your participant dashboard
             </p>
           </div>
+          {/* Demo credentials, shown on screen so a demo session needs no
+              handover note — matching the admin login. */}
+          <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-center">
+            <p className="break-words text-sm text-blue-900">
+              email: <span className="font-mono font-semibold">andrea.a.dsouza@gmail.com</span> · password:{' '}
+              <span className="font-mono font-semibold">Smart*56Star</span>
+            </p>
+          </div>
+
           <form onSubmit={handleLogin} className="space-y-6">
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
